@@ -1,0 +1,9 @@
+<RCC>
+  <qresource>
+    <file>../resources/settings_icon.png</file>
+    <file>../resources/logo.png</file>
+    <file>../resources/logo.ico</file>
+    <file>../resources/twitter.png</file>
+    <file>../resources/style.css</file>
+  </qresource>
+</RCC>

@@ -1,0 +1,115 @@
+/* This file is part of the TSM Desktop Application.
+ *
+ * The TSM Desktop Application is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * The TSM Desktop Application is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with the TSM Desktop Application.  If not, see <http://www.gnu.org/licenses/>.
+ */ 
+
+
+/* main window */
+QMainWindow {
+	background-color: rgb(11, 11, 11);
+}
+
+
+/* text */
+QLabel {
+	color : white;
+}
+QWidget[id="headerText"] QLabel {
+	color: rgb(153, 255, 255);
+	font-size: 14px;
+}
+
+
+/* tool button */
+QToolButton {
+	background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 rgb(255, 160, 32), stop: 0.5 rgb(229, 112, 0), stop: 1 rgb(239, 128, 16));
+	border-radius: 5px;
+	border: 1px solid rgb(229, 112, 0);
+	color: rgb(255, 255, 255);
+	font-weight: bold;
+	padding: 2px;
+}
+QToolButton[id="premiumButton"] {
+	font-size: 16px;
+}
+QToolButton:hover {
+	background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 rgb(238, 144, 16), stop: 0.5 rgb(213, 87, 0), stop: 1 rgb(238, 144, 16));
+}
+QToolButton:pressed {
+	background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 rgb(224, 112, 0), stop: 0.5 rgb(213, 87, 0), stop: 1 rgb(224, 112, 0));
+}
+
+
+/* tab bar */
+QTabWidget::tab-bar {
+	left: 5px; /* move to the right by 5px */
+}
+QTabBar::tab {
+	background: rgb(35, 35, 35);
+	border: 0px 0px 0px 0px;
+	min-width: 120px;
+	min-height: 20px;
+	padding: 2px 5px 2px 5px;
+	margin: 0px 0px 0px 3px;
+	font-size: 12px;
+	font-weight: bold;
+	color: white;
+}
+QTabBar::tab:hover:!selected {
+	background: rgb(100, 100, 100);
+}
+
+QTabBar::tab:!hover:!selected {
+	background: rgb(70, 70, 70);
+	padding-top: 5px;
+}
+
+
+/* tab contents */
+QTabWidget::pane {
+	border: none; /* for some reason this is necessary in order to change anything else */
+	background-color: rgb(35, 35, 35);
+}
+
+
+/* table */
+QHeaderView {
+	margin: 0px 2px 0px 0px;
+	background: rgb(60, 60, 60);
+	alternate-background-color: rgb(47, 47, 47);
+	color: white;
+}
+QHeaderView::section {
+	border: none;
+	border-left: 1px solid black;
+	border-right: 1px solid black;
+	border-bottom: 3px solid black;
+	background: rgb(70, 70, 70);
+	padding: 5px 20px;
+	color: white;
+	font-weight: bold;
+}
+QHeaderView::down-arrow, QHeaderView::up-arrow {
+	image: none;
+}
+QTableView {
+	background: rgb(35, 35, 35);
+}
+QTableView::item  {
+	background: rgb(60, 60, 60);
+	alternate-background-color: rgb(47, 47, 47);
+	color: white;
+	border-left: 1px solid black;
+	border-bottom: 1px solid black;
+}
