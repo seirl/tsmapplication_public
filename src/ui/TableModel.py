@@ -14,10 +14,12 @@
 # along with the TSM Desktop Application.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from operator import itemgetter
+# PyQt5
+from PyQt5.QtCore import QAbstractTableModel, Qt
+from PyQt5.QtGui import QBrush, QColor, QFont
 
-from PyQt5.QtCore import Qt, QAbstractTableModel
-from PyQt5.QtGui import QFont, QBrush, QColor
+# General python modules
+from operator import itemgetter
 
 
 class TableModel(QAbstractTableModel):
@@ -26,11 +28,14 @@ class TableModel(QAbstractTableModel):
         self._data = []
         self._header = header
 
+
     def rowCount(self, parent):
         return len(self._data)
 
+
     def columnCount(self, parent):
         return len(self._header)
+
 
     def data(self, index, role):
         if not index.isValid():
@@ -40,12 +45,14 @@ class TableModel(QAbstractTableModel):
             return self._data[index.row()][index.column()]
         return None
 
+
     def headerData(self, col, orientation, role):
         if orientation != Qt.Horizontal:
             return None
         if role == Qt.DisplayRole:
             return self._header[col]
         return None
+
 
     def setData(self, data):
         self.beginResetModel()
@@ -60,6 +67,7 @@ class TableModel(QAbstractTableModel):
             self._data.append(temp_row)
         self.endResetModel()
         return True
+
 
     def sort(self, col, order):
         self.beginResetModel()

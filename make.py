@@ -13,12 +13,17 @@
 # You should have received a copy of the GNU General Public License
 # along with the TSM Desktop Application.  If not, see <http://www.gnu.org/licenses/>.
 
-import sys
-import os
+
+# PyQt5
 from PyQt5 import uic
-import fnmatch
-import shutil
+
+# General python modules
 import argparse
+import fnmatch
+import os
+import sys
+import shutil
+
 
 # what commands to run by default
 DEFAULT_OPERATIONS = ["clean", "build", "run"]

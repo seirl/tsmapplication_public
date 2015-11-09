@@ -4,6 +4,7 @@
     <file>../resources/logo.png</file>
     <file>../resources/logo.ico</file>
     <file>../resources/twitter.png</file>
-    <file>../resources/style.css</file>
+    <file>../resources/main_window.css</file>
+    <file>../resources/login_window.css</file>
   </qresource>
 </RCC>

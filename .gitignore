@@ -4,3 +4,5 @@ build/
 dist/
 
 TSMApplication.log*
+
+src/PrivateConfig.py
