@@ -22,7 +22,7 @@ from ui.LoginWindow import LoginWindow
 from ui.MainWindow import MainWindow
 
 # PyQt5
-from PyQt5.QtCore import QObject, QByteArray, QSettings
+from PyQt5.QtCore import QObject
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox
 
 # General python modules

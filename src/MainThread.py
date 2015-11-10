@@ -19,6 +19,7 @@ from AppAPI import AppAPI, ApiError, ApiTransientError
 import Config
 import PrivateConfig
 from Settings import load_settings
+from WoWHelper import WoWHelper
 
 # PyQt5
 from PyQt5.QtCore import pyqtSignal, QMutex, QSettings, QThread, QVariant, QWaitCondition
@@ -74,15 +75,39 @@ class MainThread(QThread):
 
 
     def __init__(self):
+        # initi parent class and get a refernece to the logger
         QThread.__init__(self)
-        self._api = AppAPI()
         self._logger = logging.getLogger()
+
+        # load settings
         self._settings = load_settings(Config.DEFAULT_SETTINGS)
+        if self._settings.version == 0:
+            # this is the first time we've run r300 or higher
+            old_login_settings = load_settings(Config.DEFAULT_OLD_LOGIN_SETTINGS, Config.ORG_NAME, "TSMAppLogin")
+            if old_login_settings.userId > 0:
+                # import the settings we care about from the old app
+                self._settings.email = old_login_settings.email
+                self._settings.password = str(old_login_settings.password, encoding="ascii")
+                self._settings.accepted_terms = (old_login_settings.touAccepted == "true")
+                # need to use QSettings directly for the regular settings since it uses groups / arrays
+                old_settings = QSettings(QSettings.IniFormat, QSettings.UserScope, Config.ORG_NAME, "TSMApplication")
+                self._settings.wow_path = old_settings.value("core/wowDirPath", Config.DEFAULT_SETTINGS['wow_path'])
+                self._settings.tsm3_beta = (WoWHelper().get_installed_version("TradeSkillMaster")[0] == WoWHelper.BETA_VERSION)
+                # TODO: clear the old settings
+                self._logger.info("Imported old settings!")
+        self._settings.version = Config.CURRENT_VERSION
+
+        # initialize other helper classes
+        self._api = AppAPI()
+        self._wow_helper = WoWHelper()
+
         # initialize the variables which allow us to wait for signals
         self._wait_event = self.WaitEvent.NONE
         self._wait_context = None
         self._wait_condition = QWaitCondition()
         self._wait_mutex = QMutex()
+
+        # initialize the FSM state
         self._state = self.State.INIT
 
 
@@ -102,30 +127,13 @@ class MainThread(QThread):
     def _fire_wait_event(self, event, context=None):
         if self._wait_event != event:
             self._logger.info("Dropping event: {}".format(event))
-            return;
+            return
         self._wait_context = context
         self._wait_condition.wakeAll()
 
 
     def login_button_clicked(self, email, password):
         self._fire_wait_event(self.WaitEvent.LOGIN_BUTTON, (email, password))
-
-
-    def _load_settings(self):
-        if self._settings.version == 0:
-            # this is the first time we've run r300 or higher
-            old_login_settings = load_settings(Config.DEFAULT_OLD_LOGIN_SETTINGS, Config.ORG_NAME, "TSMAppLogin")
-            if old_login_settings.userId > 0:
-                # import the settings we care about from the old app
-                self._settings.email = old_login_settings.email
-                self._settings.password = str(old_login_settings.password, encoding="ascii")
-                self._settings.accepted_terms = (old_login_settings.touAccepted == "true")
-                # need to use QSettings directly for the regular settings since it uses groups / arrays
-                old_settings = QSettings(QSettings.IniFormat, QSettings.UserScope, Config.ORG_NAME, "TSMApplication")
-                self._settings.wow_path = old_settings.value("core/wowDirPath", DEFAULT_SETTINGS.wow_path)
-                # TODO: clear the old settings
-                self._logger.info("Imported old settings!")
-        self._settings.version = Config.CURRENT_VERSION
 
 
     def _set_fsm_state(self, new_state):
@@ -196,13 +204,37 @@ class MainThread(QThread):
     def _check_status(self):
         try:
             result = self._api.status()
-            # TODO - do stuff here!
         except (ApiError, ApiTransientError) as e:
             self._logger.error("Got error from status API: {}".format(str(e)))
 
+        # check addon versions
+        addon_status = []
+        for addon in result['addons']:
+            name = addon['name']
+            latest_version = addon['BetaVersion'] if self._settings.tsm3_beta else addon['Version']
+            version_type, version_int, version_str = self._wow_helper.get_installed_version(addon['name'])
+            if version_type == WoWHelper.INVALID_VERSION:
+                status = "Not installed"
+            elif version_type == WoWHelper.RELEASE_VERSION or version_type == WoWHelper.BETA_VERSION:
+                if latest_version == 0:
+                    # TODO: uninstall
+                    status = "Uninstalling..."
+                elif version_int < latest_version:
+                    # TODO: update
+                    status = "Updating"
+            elif version_type == WoWHelper.DEV_VERSION:
+                status = "Automatic updates disabled"
+            else:
+                raise Exception("Unexpected version type for {} ({}): {}".format(addon, version_str, version_type))
+            addon_status.append([name, version_str, status])
+        self.set_main_window_addon_status_data.emit(addon_status)
+
+        # check realm data (AuctionDB / Shopping / WoWuction) status
+        for realm in result['realms']:
+            pass
+
 
     def run(self):
-        self._load_settings()
         while True:
             if self._state == self.State.INIT:
                 # just go to the next state - this is so we can show the login window when we enter LOGGED_OUT
@@ -230,21 +262,6 @@ class MainThread(QThread):
                     # ('Illidan', 'Updated 2 minutes ago', 'Updated 14 hours ago', 'Updated 2 minutes ago'),
                 # ]
                 # self.set_main_window_sync_status_data.emit(sync_status)
-                # addon_versions = [
-                    # ('TradeSkillMaster', '3X205', 'Up to date'),
-                    # ('TradeSkillMaster_Accounting', '3X30', 'Up to date'),
-                    # ('TradeSkillMaster_AppHelper', '3X4', 'Up to date'),
-                    # ('TradeSkillMaster_AuctionDB', '3X10', 'Up to date'),
-                    # ('TradeSkillMaster_Auctioning', '3X84', 'Up to date'),
-                    # ('TradeSkillMaster_Crafting', '3X91', 'Up to date'),
-                    # ('TradeSkillMaster_Destroying', '3X27', 'Up to date'),
-                    # ('TradeSkillMaster_Mailing', '3X42', 'Up to date'),
-                    # ('TradeSkillMaster_Shopping', '3X68', 'Up to date'),
-                    # ('TradeSkillMaster_Vendoring', '3X46', 'Up to date'),
-                    # ('TradeSkillMaster_Warehousing', '3X14', 'Up to date'),
-                    # ('TradeSkillMaster_WoWuction', '3X5', 'Up to date'),
-                # ]
-                # self.set_main_window_addon_status_data.emit(addon_versions)
                 # self.sleep(300)
             else:
                 raise Exception("Invalid state {}".format(self._state))

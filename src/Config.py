@@ -26,11 +26,12 @@ DEFAULT_SETTINGS = {
     'email': "",
     'password': "",
     'accepted_terms': False,
-    'wow_path': ""
+    'wow_path': "",
+    'tsm3_beta': False,
 }
 DEFAULT_OLD_LOGIN_SETTINGS = {
     'userId': 0,
     'email': "",
     'password': b"",
-    'touAccepted': "false"
+    'touAccepted': "false",
 }

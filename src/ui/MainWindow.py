@@ -22,7 +22,7 @@ from ui.TableModel import TableModel
 # PyQt5
 from PyQt5.QtCore import QFile, QIODevice, Qt
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QMainWindow, QMessageBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox
 
 
 class MainWindow(QMainWindow):
@@ -34,6 +34,9 @@ class MainWindow(QMainWindow):
         self._ui = Ui_MainWindow()
         self._ui.setupUi(self)
         self.setWindowTitle("TradeSkillMaster Application r{}".format(Config.CURRENT_VERSION))
+
+        # connect signals / slots
+        self._ui.addon_status_table.clicked.connect(self._addon_status_table_clicked)
 
         # Apply the stylesheet
         file = QFile(":/resources/main_window.css")
@@ -50,6 +53,12 @@ class MainWindow(QMainWindow):
         
         self._addon_status_table_model = TableModel(self, ['Name', 'Version', 'Status'])
         self._ui.addon_status_table.setModel(self._addon_status_table_model)
+
+
+    def _addon_status_table_clicked(self, index):
+        if not index.isValid():
+            return
+        # TODO: do something with index.row(), index.column()
 
 
     def set_sync_status_data(self, data):
