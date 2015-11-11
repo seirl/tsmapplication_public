@@ -20,6 +20,8 @@ import PrivateConfig
 
 # General python modules
 from hashlib import sha256, sha512
+from gzip import GzipFile
+from io import BytesIO
 import json
 import logging
 from time import time
@@ -67,18 +69,25 @@ class AppAPI:
         logger = logging.getLogger()
         logger.debug("Making request: {}".format(url))
         try:
-            with urlopen(Request(url, headers={'Accept-Encoding': "gzip,deflate"})) as response:
-                raw_data = response.read().decode(response.info().get_param('charset') or 'utf-8')
-                data = json.loads(raw_data)
-                if not data:
-                    # the data is invalid
-                    logger.error("Invalid data: '{}'".format(raw_data))
-                    raise ApiTransientError()
-                elif not data.pop("success", False):
-                    # this request failed and we got an error back
-                    raise ApiError(data['error'])
-                # this request was successful
-                return data
+            with urlopen(Request(url, headers={'Accept-Encoding': "gzip"})) as response:
+                content_type = response.info().get_content_type()
+                raw_data = response.read()
+                if response.info().get("Content-Encoding") == "gzip":
+                    raw_data = GzipFile(fileobj=BytesIO(raw_data), mode="rb").read()
+                if content_type == "application/zip":
+                    return raw_data
+                elif content_type == "application/json":
+                    raw_data = raw_data.decode(response.info().get_param("charset", "utf-8"))
+                    data = json.loads(raw_data)
+                    if not data:
+                        # the data is invalid
+                        logger.error("Invalid data: '{}'".format(raw_data))
+                        raise ApiTransientError()
+                    elif not data.pop("success", False):
+                        # this request failed and we got an error back
+                        raise ApiError(data['error'])
+                    # this request was successful
+                    return data
         except URLError as e:
             # the request failed (weren't able to connect to the server)
             if isinstance(e, HTTPError):
@@ -109,6 +118,10 @@ class AppAPI:
 
     def status(self):
         return self._make_request("status")
+
+
+    def addon(self, name, version):
+        return self._make_request("addon", name, version)
 
 
     def logout(self):

@@ -15,22 +15,19 @@
 
 
 # PyQt5
-from PyQt5.QtCore import QAbstractTableModel, Qt
-from PyQt5.QtGui import QBrush, QColor, QFont
-
-# General python modules
-from operator import itemgetter
+from PyQt5.QtCore import pyqtSignal, QAbstractTableModel, Qt
+from PyQt5.QtGui import QBrush, QColor
 
 
 class TableModel(QAbstractTableModel):
     def __init__(self, parent, header, *args):
         QAbstractTableModel.__init__(self, parent, *args)
-        self._data = []
         self._header = header
+        self._info = []
 
 
     def rowCount(self, parent):
-        return len(self._data)
+        return len(self._info)
 
 
     def columnCount(self, parent):
@@ -40,9 +37,12 @@ class TableModel(QAbstractTableModel):
     def data(self, index, role):
         if not index.isValid():
             return None
+        cell_info = self._info[index.row()][index.column()]
         if role == Qt.DisplayRole:
             # return the text to be displayed
-            return self._data[index.row()][index.column()]
+            return cell_info['text']
+        elif role == Qt.ForegroundRole:
+            return QBrush(QColor(*cell_info['color']))
         return None
 
 
@@ -54,25 +54,36 @@ class TableModel(QAbstractTableModel):
         return None
 
 
-    def setData(self, data):
+    def set_info(self, info):
         self.beginResetModel()
-        self._data = []
-        for row in data:
+        # set defaults
+        for row in info:
             temp_row = []
-            if len(row) != len(self._header):
-                raise Exception("Invalid data!")
-            for cell in row:
-                # put spaces around cell contents
-                temp_row.append(" {} ".format(cell))
-            self._data.append(temp_row)
+            assert(len(row) == len(self._header))
+            for cell_info in row:
+                # put spaces around text
+                cell_info['text'] = " {} ".format(cell_info['text'])
+                if 'color' not in cell_info:
+                    cell_info['color'] = [255, 255, 255]
+                if 'click_enabled' not in cell_info:
+                    cell_info['click_enabled'] = False
+                elif cell_info['click_enabled']:
+                    assert(cell_info['click_key'])
+        self._info = info
         self.endResetModel()
         return True
+
+
+    def get_click_key(self, index):
+        if not index.isValid() or not self._info[index.row()][index.column()]['click_enabled']:
+            return None
+        return self._info[index.row()][index.column()]['click_key']
 
 
     def sort(self, col, order):
         self.beginResetModel()
         self.layoutAboutToBeChanged.emit()
-        self._data = sorted(self._data, key=itemgetter(col))        
+        self._info = sorted(self._info, key=lambda info: info[col]['text'])        
         if order == Qt.DescendingOrder:
-            self._data.reverse()
+            self._info.reverse()
         self.endResetModel()

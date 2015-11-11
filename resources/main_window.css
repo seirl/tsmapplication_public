@@ -109,7 +109,6 @@ QTableView {
 QTableView::item  {
 	background: rgb(60, 60, 60);
 	alternate-background-color: rgb(47, 47, 47);
-	color: white;
 	border-left: 1px solid black;
 	border-bottom: 1px solid black;
 }

@@ -20,12 +20,15 @@ from main_window_ui import Ui_MainWindow
 from ui.TableModel import TableModel
 
 # PyQt5
-from PyQt5.QtCore import QFile, QIODevice, Qt
+from PyQt5.QtCore import pyqtSignal, QFile, QIODevice, Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox
 
 
 class MainWindow(QMainWindow):
+    addon_status_table_clicked = pyqtSignal(str)
+
+
     def __init__(self):
         # Init the base class
         QMainWindow.__init__(self)
@@ -36,7 +39,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("TradeSkillMaster Application r{}".format(Config.CURRENT_VERSION))
 
         # connect signals / slots
-        self._ui.addon_status_table.clicked.connect(self._addon_status_table_clicked)
+        self._ui.addon_status_table.doubleClicked.connect(self._addon_status_table_clicked)
 
         # Apply the stylesheet
         file = QFile(":/resources/main_window.css")
@@ -47,28 +50,28 @@ class MainWindow(QMainWindow):
         # set properties which are necessary for tweaking the style
         self._ui.premium_button.setProperty("id", "premiumButton")
         self._ui.header.setProperty("id", "headerText")
-        
+
         self._sync_status_table_model = TableModel(self, ['Realm', 'AuctionDB', 'WoWuction', 'Great Deals'])
         self._ui.sync_status_table.setModel(self._sync_status_table_model)
-        
+
         self._addon_status_table_model = TableModel(self, ['Name', 'Version', 'Status'])
         self._ui.addon_status_table.setModel(self._addon_status_table_model)
 
 
     def _addon_status_table_clicked(self, index):
-        if not index.isValid():
-            return
-        # TODO: do something with index.row(), index.column()
+        key = self._addon_status_table_model.get_click_key(index)
+        if key:
+            self.addon_status_table_clicked.emit(key)
 
 
     def set_sync_status_data(self, data):
-        self._sync_status_table_model.setData(data)
+        self._sync_status_table_model.set_info(data)
         self._ui.sync_status_table.resizeColumnsToContents()
         self._ui.sync_status_table.sortByColumn(0, Qt.AscendingOrder)
 
 
     def set_addon_status_data(self, data):
-        self._addon_status_table_model.setData(data)
+        self._addon_status_table_model.set_info(data)
         self._ui.addon_status_table.resizeColumnsToContents()
         self._ui.addon_status_table.sortByColumn(0, Qt.AscendingOrder)
 

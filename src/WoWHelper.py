@@ -21,6 +21,7 @@ from Settings import load_settings
 # General python modules
 import logging
 import os
+from shutil import rmtree
 
 
 class WoWHelper:
@@ -36,6 +37,10 @@ class WoWHelper:
         logging.getLogger().info("WoW path is set to '{}'".format(self._settings.wow_path))
 
 
+    def _get_addon_path(self, addon):
+        return os.path.join(self._settings.wow_path, "Interface", "Addons", addon)
+
+
     def set_wow_path(self, path):
         # We'll validate the WoW folder by checking for Interface/Addons and WTF folders
         if not os.path.isdir(os.path.join(path, "Interface", "Addons")) and os.path.isdir(os.path.join(path, "WTF")):
@@ -49,7 +54,7 @@ class WoWHelper:
         if self._settings.wow_path == "":
             return self.INVALID_VERSION, 0, ""
         # look at the addon's TOC file to get the current version
-        toc_path = os.path.join(self._settings.wow_path, "Interface", "Addons", addon, "{}.toc".format(addon))
+        toc_path = os.path.join(self._get_addon_path(addon), "{}.toc".format(addon))
         if not os.path.isfile(toc_path):
             return self.INVALID_VERSION, 0, ""
         # get the version as a string
@@ -84,3 +89,15 @@ class WoWHelper:
         else:
             logging.getLogger().error("Invalid version line for {}: {}".format(addon, line))
         return self.INVALID_VERSION, 0, ""
+
+
+    def delete_addon(self, addon):
+        addon_dir = self._get_addon_path(addon)
+        if os.path.isdir(addon_dir):
+            rmtree(addon_dir)
+
+
+    def install_addon(self, addon, zip):
+        # remove the addon if it already exists
+        self.delete_addon(addon)
+        zip.extractall(os.path.abspath(os.path.join(self._get_addon_path(addon), os.pardir)))

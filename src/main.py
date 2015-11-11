@@ -22,7 +22,7 @@ from ui.LoginWindow import LoginWindow
 from ui.MainWindow import MainWindow
 
 # PyQt5
-from PyQt5.QtCore import QObject
+from PyQt5.QtCore import QObject, Qt
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox
 
 # General python modules
@@ -76,6 +76,7 @@ class TSMApp(QObject):
         self._main_thread.set_login_window_button_text.connect(self._login_window.set_button_text)
         self._main_thread.set_login_window_error_text.connect(self._login_window.set_error_text)
         # set main window signals / slots
+        self._main_window.addon_status_table_clicked.connect(self._main_thread.addon_status_table_clicked, Qt.QueuedConnection)
         self._main_thread.set_main_window_visible.connect(self._main_window.setVisible)
         self._main_thread.set_main_window_header_text.connect(self._main_window._ui.header_text.setText)
         self._main_thread.set_main_window_sync_status_data.connect(self._main_window.set_sync_status_data)

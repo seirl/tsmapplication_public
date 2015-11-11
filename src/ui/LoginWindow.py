@@ -19,7 +19,7 @@ import Config
 from login_window_ui import Ui_LoginWindow
 
 # PyQt5
-from PyQt5.QtCore import pyqtSignal, QFile, QIODevice, pyqtSlot, Qt
+from PyQt5.QtCore import pyqtSignal, QFile, QIODevice, Qt
 from PyQt5.QtWidgets import QMainWindow
 
 

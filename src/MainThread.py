@@ -27,10 +27,12 @@ from PyQt5.QtCore import pyqtSignal, QMutex, QSettings, QThread, QVariant, QWait
 # General python modules
 from enum import Enum
 from hashlib import sha512
+from io import BytesIO
 import logging
 import re
 import sys
 from time import time, sleep
+from zipfile import ZipFile
 
 
 class MainThread(QThread):
@@ -136,6 +138,27 @@ class MainThread(QThread):
         self._fire_wait_event(self.WaitEvent.LOGIN_BUTTON, (email, password))
 
 
+    def addon_status_table_clicked(self, click_key):
+        parts = click_key.split("~")
+        table = parts.pop(0)
+        if table == "addon":
+            self._download_addon(*parts)
+        else:
+            raise Exception("Invalid table: {}".format(click_key))
+
+
+    def _download_addon(self, addon, version):
+        self._logger.info("Downloading {} version of {}".format(version, addon))
+        try:
+            with ZipFile(BytesIO(self._api.addon(addon, version))) as zip:
+                self._wow_helper.install_addon(addon, zip)
+        except (ApiTransientError, ApiError) as e:
+            # either the user or we will try again later
+            self._logger.error("Addon download error: {}".format(str(e)))
+            if isinstance(e, ApiError):
+                self._set_fsm_state(self.State.LOGGED_OUT)
+
+
     def _set_fsm_state(self, new_state):
         if new_state == self._state:
             # already in the desired state
@@ -195,7 +218,6 @@ class MainThread(QThread):
             # send off a login request
             self.set_login_window_enabled.emit(False)
             self.set_login_window_button_text.emit("Logging in...")
-            self.sleep(1) # this is just so we don't open/close the window too fast when first loading
             error_msg = self._login_request()
             if error_msg:
                 self.set_login_window_error_text.emit(error_msg)
@@ -208,26 +230,40 @@ class MainThread(QThread):
             self._logger.error("Got error from status API: {}".format(str(e)))
 
         # check addon versions
+        addon_updates = []
         addon_status = []
         for addon in result['addons']:
             name = addon['name']
-            latest_version = addon['BetaVersion'] if self._settings.tsm3_beta else addon['Version']
+            latest_version = addon['betaVersion'] if self._settings.tsm3_beta else addon['version']
             version_type, version_int, version_str = self._wow_helper.get_installed_version(addon['name'])
-            if version_type == WoWHelper.INVALID_VERSION:
-                status = "Not installed"
+            status = None
+            if version_type == WoWHelper.INVALID_VERSION or True:
+                status = {'text':"Not installed (double-click to install)", 'click_enabled':True, 'click_key':"addon~{}~{}".format(name, "beta")}
             elif version_type == WoWHelper.RELEASE_VERSION or version_type == WoWHelper.BETA_VERSION:
                 if latest_version == 0:
-                    # TODO: uninstall
-                    status = "Uninstalling..."
+                    # this addon no longer exists, so uninstall it (and don't set a status)
+                    # TODO
+                    pass
                 elif version_int < latest_version:
-                    # TODO: update
-                    status = "Updating"
+                    # this addon needs to be updated
+                    if self._api.get_is_premium() or self._settings.tsm3_beta:
+                        # defer the auto-updating until after we set the status
+                        addon_updates.append(name)
+                        status = {'text':"Updating..."}
+                    else:
+                        status = {'text':"Update available. Please update or go premium for automatic updates.", 'color':[255, 0, 0]}
             elif version_type == WoWHelper.DEV_VERSION:
-                status = "Automatic updates disabled"
+                status = {'text':"Automatic updates disabled"}
             else:
                 raise Exception("Unexpected version type for {} ({}): {}".format(addon, version_str, version_type))
-            addon_status.append([name, version_str, status])
+            if status:
+                addon_status.append([{'text':name}, {'text':version_str}, status])
         self.set_main_window_addon_status_data.emit(addon_status)
+
+        # update addons
+        for name in addon_updates:
+            # TODO: do the update
+            pass
 
         # check realm data (AuctionDB / Shopping / WoWuction) status
         for realm in result['realms']:
@@ -252,7 +288,7 @@ class MainThread(QThread):
                 self._set_fsm_state(self.State.SLEEPING)
             elif self._state == self.State.SLEEPING:
                 # go to sleep and then go back to PENDING_NEW_SESSION
-                self.sleep(10)
+                self.sleep(60)
                 self._set_fsm_state(self.State.PENDING_NEW_SESSION)
                 # sync_status = [
                     # ('US Region', 'Updated 2 minutes ago', 'Updated 14 hours ago', 'Updated 2 minutes ago'),
