@@ -19,9 +19,9 @@ import Config
 import PrivateConfig
 
 # General python modules
-from hashlib import sha256, sha512
+from hashlib import md5, sha1, sha256, sha512
 from gzip import GzipFile
-from io import BytesIO
+from io import BytesIO, StringIO
 import json
 import logging
 from time import time
@@ -30,7 +30,6 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
 
-_APP_API_BASE_URL = "http://app-server.tradeskillmaster.com/app/v1"
 _DEFAULT_USER_INFO = {
     'session': "",
     'userId': 0,
@@ -57,7 +56,20 @@ class AppAPI:
         self._user_info = _DEFAULT_USER_INFO.copy()
 
 
-    def _make_request(self, *args):
+    def _make_request(self, *args, **kwargs):
+        data = kwargs.pop('data', None)
+        assert(not kwargs)
+        headers = {
+            'Accept-Encoding': 'gzip',
+        }
+        if data:
+            # gzip the data
+            buffer = BytesIO()
+            with GzipFile(fileobj=buffer, mode="wb") as f:
+                f.write(bytes(data, 'UTF-8'))
+            data = buffer.getvalue()
+            headers['Content-Type'] = "text/plain"
+            headers['Content-Encoding'] = "gzip"
         current_time = int(time())
         query_params = {
             'session': self._user_info['session'],
@@ -65,15 +77,16 @@ class AppAPI:
             'time': current_time,
             'token': sha256("{}:{}:{}".format(Config.CURRENT_VERSION, current_time, PrivateConfig.get_token_salt()).encode("utf-8")).hexdigest()
         }
-        url = "{}/{}?{}".format(_APP_API_BASE_URL, "/".join(args), urlencode(query_params))
+        url = "{}/{}?{}".format(Config.APP_API_BASE_URL, "/".join(args), urlencode(query_params))
         logger = logging.getLogger()
         logger.debug("Making request: {}".format(url))
         try:
-            with urlopen(Request(url, headers={'Accept-Encoding': "gzip"})) as response:
+            with urlopen(Request(url, headers=headers, data=data)) as response:
                 content_type = response.info().get_content_type()
                 raw_data = response.read()
                 if response.info().get("Content-Encoding") == "gzip":
-                    raw_data = GzipFile(fileobj=BytesIO(raw_data), mode="rb").read()
+                    with GzipFile(fileobj=BytesIO(raw_data), mode="rb") as f:
+                        raw_data = f.read()
                 if content_type == "application/zip":
                     return raw_data
                 elif content_type == "application/json":
@@ -109,6 +122,10 @@ class AppAPI:
         return self._user_info['isPremium']
 
 
+    def logout(self):
+        self._user_info = _DEFAULT_USER_INFO
+
+
     def login(self, email, password):
         email_hash = sha256(email.encode("utf-8")).hexdigest()
         password_hash = sha512((password + PrivateConfig.get_password_salt()).encode("utf-8")).hexdigest()
@@ -124,5 +141,5 @@ class AppAPI:
         return self._make_request("addon", name, version)
 
 
-    def logout(self):
-        self._user_info = _DEFAULT_USER_INFO
+    def log(self, data):
+        return self._make_request("log", data=data)

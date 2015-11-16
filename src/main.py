@@ -20,6 +20,7 @@ import Config
 from Settings import load_settings
 from ui.LoginWindow import LoginWindow
 from ui.MainWindow import MainWindow
+from ui.SettingsWindow import SettingsWindow
 
 # PyQt5
 from PyQt5.QtCore import QObject, Qt
@@ -51,20 +52,13 @@ class TSMApp(QObject):
         self._logger.addHandler(handler)
 
 
-    # def show_terms_of_use(self):
-        # accepted = self._main_window.show_message_box(QMessageBox.Warning, "TradeSkillMaster Application Terms of Use", "By clicking 'OK' you are acknowledging acceptance of the <a href='http://www.tradeskillmaster.com/site/terms'>TSM Terms of Use</a>.<br>If you do not accept the terms, click cancel to close the application.", True)
-        # if not accepted:
-            # # They didn't accept, so exit
-            # sys.exit(0)
-        # self._settings.accepted_terms = True
-
-
     def run(self):
         self._logger.info("Starting TSM Application r{}".format(Config.CURRENT_VERSION))
 
         # Create the windows
         self._login_window = LoginWindow()
         self._main_window = MainWindow()
+        self._settings_window = SettingsWindow(self._main_window)
 
         # Setup the main thread which handles all the business logic
         self._main_thread = MainThread()
@@ -75,13 +69,19 @@ class TSMApp(QObject):
         self._main_thread.set_login_window_form_values.connect(self._login_window.set_form_values)
         self._main_thread.set_login_window_button_text.connect(self._login_window.set_button_text)
         self._main_thread.set_login_window_error_text.connect(self._login_window.set_error_text)
-        # set main window signals / slots
+        # connect main window signals / slots
+        self._main_window.settings_button_clicked.connect(self._settings_window.show)
         self._main_window.addon_status_table_clicked.connect(self._main_thread.addon_status_table_clicked, Qt.QueuedConnection)
         self._main_thread.set_main_window_visible.connect(self._main_window.setVisible)
         self._main_thread.set_main_window_header_text.connect(self._main_window._ui.header_text.setText)
         self._main_thread.set_main_window_sync_status_data.connect(self._main_window.set_sync_status_data)
         self._main_thread.set_main_window_addon_status_data.connect(self._main_window.set_addon_status_data)
-        # set general signals / slots
+        # connect settings window signals / slots
+        self._settings_window.settings_changed.connect(self._main_thread.on_settings_changed)
+        self._settings_window.upload_log_file.connect(self._main_thread.upload_log_file)
+        self._main_thread.settings_changed.connect(self._settings_window.on_settings_changed)
+        self._main_thread.log_uploaded.connect(self._settings_window.log_uploaded)
+        # connect general signals / slots
         self._main_thread.finished.connect(self._app.exit)
         # start the thread
         self._main_thread.start()

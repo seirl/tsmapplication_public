@@ -6,5 +6,6 @@
     <file>../resources/twitter.png</file>
     <file>../resources/main_window.css</file>
     <file>../resources/login_window.css</file>
+    <file>../resources/settings_window.css</file>
   </qresource>
 </RCC>

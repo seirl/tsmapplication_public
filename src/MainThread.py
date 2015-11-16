@@ -22,7 +22,9 @@ from Settings import load_settings
 from WoWHelper import WoWHelper
 
 # PyQt5
-from PyQt5.QtCore import pyqtSignal, QMutex, QSettings, QThread, QVariant, QWaitCondition
+from PyQt5.QtCore import pyqtSignal, QMutex, QSettings, QThread, QVariant, QWaitCondition, Qt
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QMessageBox
 
 # General python modules
 from enum import Enum
@@ -74,6 +76,8 @@ class MainThread(QThread):
     set_main_window_header_text = pyqtSignal(str)
     set_main_window_sync_status_data = pyqtSignal(list)
     set_main_window_addon_status_data = pyqtSignal(list)
+    settings_changed = pyqtSignal()
+    log_uploaded = pyqtSignal(bool)
 
 
     def __init__(self):
@@ -102,6 +106,7 @@ class MainThread(QThread):
         # initialize other helper classes
         self._api = AppAPI()
         self._wow_helper = WoWHelper()
+        self._wow_helper.addons_folder_changed.connect(self._update_addon_status)
 
         # initialize the variables which allow us to wait for signals
         self._wait_event = self.WaitEvent.NONE
@@ -109,8 +114,10 @@ class MainThread(QThread):
         self._wait_condition = QWaitCondition()
         self._wait_mutex = QMutex()
 
-        # initialize the FSM state
+        # initialize the FSM state and related variables
         self._state = self.State.INIT
+        self._sleep_time = 0
+        self._addon_versions = []
 
 
     def _wait_for_event(self, event):
@@ -143,8 +150,29 @@ class MainThread(QThread):
         table = parts.pop(0)
         if table == "addon":
             self._download_addon(*parts)
+            self._update_addon_status()
         else:
             raise Exception("Invalid table: {}".format(click_key))
+
+
+    def upload_log_file(self):
+        with open(Config.LOG_FILE_NAME) as log_file:
+            data = log_file.read()
+        try:
+            # self._api.log(log_file.read())
+            self.log_uploaded.emit(True)
+        except (ApiTransientError, ApiError) as e:
+            self.log_uploaded.emit(False)
+
+
+    def on_settings_changed(self):
+        if not self._wow_helper.has_valid_wow_path() and self._wow_helper.set_wow_path(self._settings.wow_path) and self._state == self.State.SLEEPING:
+            # we just got a valid wow directory so stop sleeping
+            self.stop_sleeping()
+
+
+    def stop_sleeping(self):
+        self._sleep_time = 0
 
 
     def _download_addon(self, addon, version):
@@ -170,6 +198,21 @@ class MainThread(QThread):
 
         self._logger.info("Set FSM state to {}".format(new_state))
         is_logged_out = (new_state == self.State.LOGGED_OUT)
+        # show the ToU if they haven't already accepted them
+        if not is_logged_out and not self._settings.accepted_terms:
+            msg_box = QMessageBox()
+            msg_box.setWindowIcon(QIcon(":/resources/logo.png"))
+            msg_box.setWindowModality(Qt.ApplicationModal)
+            msg_box.setIcon(QMessageBox.Warning)
+            msg_box.setText("TradeSkillMaster Application Terms of Use")
+            msg_box.setTextFormat(Qt.RichText)
+            msg_box.setInformativeText("By clicking 'OK' you are agreeing to the <a href='http://www.tradeskillmaster.com/site/terms'>TSM Terms of Use</a>.<br>If you do not accept the terms, click cancel to close the application.")
+            msg_box.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+            msg_box.setDefaultButton(QMessageBox.Cancel)
+            if msg_box.exec_() != QMessageBox.Ok:
+                # They didn't accept, so exit
+                sys.exit(0)
+            self._settings.accepted_terms = True
         self.set_main_window_visible.emit(not is_logged_out)
         self.set_login_window_visible.emit(is_logged_out)
         if new_state == self.State.LOGGED_OUT:
@@ -177,7 +220,8 @@ class MainThread(QThread):
         elif new_state == self.State.PENDING_NEW_SESSION:
             pass
         elif new_state == self.State.VALID_SESSION:
-            pass
+            self._settings.has_beta_access = self._api.get_is_premium()
+            self.settings_changed.emit()
         elif new_state == self.State.SLEEPING:
             pass
         else:
@@ -188,15 +232,18 @@ class MainThread(QThread):
         try:
             self._api.login(self._settings.email, self._settings.password)
             # the login was successful!
-            self._logger.info("Logged in successfully!")
+            self._logger.info("Logged in successfully ({})!".format(self._api.get_username()))
             self._set_fsm_state(self.State.VALID_SESSION)
         except (ApiTransientError, ApiError) as e:
             # either the user or we will try again later
             self._logger.error("Login error: {}".format(str(e)))
-            self._settings.email = ""
-            self._settings.password = ""
             if isinstance(e, ApiError):
+                self._settings.email = ""
+                self._settings.password = ""
                 self._set_fsm_state(self.State.LOGGED_OUT)
+            else:
+                # try again in 5 minutes
+                self.sleep(60)
             return str(e)
 
     def _login(self):
@@ -229,75 +276,92 @@ class MainThread(QThread):
         except (ApiError, ApiTransientError) as e:
             self._logger.error("Got error from status API: {}".format(str(e)))
 
-        # check addon versions
-        addon_updates = []
-        addon_status = []
-        for addon in result['addons']:
-            name = addon['name']
+        # update addon status
+        self._addon_versions = result['addons']
+        self._update_addon_status()
+
+        # download addon updates
+        for addon in self._addon_versions:
             latest_version = addon['betaVersion'] if self._settings.tsm3_beta else addon['version']
             version_type, version_int, version_str = self._wow_helper.get_installed_version(addon['name'])
-            status = None
-            if version_type == WoWHelper.INVALID_VERSION or True:
-                status = {'text':"Not installed (double-click to install)", 'click_enabled':True, 'click_key':"addon~{}~{}".format(name, "beta")}
-            elif version_type == WoWHelper.RELEASE_VERSION or version_type == WoWHelper.BETA_VERSION:
+            if version_type in [WoWHelper.RELEASE_VERSION, WoWHelper.BETA_VERSION]:
                 if latest_version == 0:
-                    # this addon no longer exists, so uninstall it (and don't set a status)
-                    # TODO
-                    pass
-                elif version_int < latest_version:
-                    # this addon needs to be updated
-                    if self._api.get_is_premium() or self._settings.tsm3_beta:
-                        # defer the auto-updating until after we set the status
-                        addon_updates.append(name)
-                        status = {'text':"Updating..."}
-                    else:
-                        status = {'text':"Update available. Please update or go premium for automatic updates.", 'color':[255, 0, 0]}
-            elif version_type == WoWHelper.DEV_VERSION:
-                status = {'text':"Automatic updates disabled"}
-            else:
-                raise Exception("Unexpected version type for {} ({}): {}".format(addon, version_str, version_type))
-            if status:
-                addon_status.append([{'text':name}, {'text':version_str}, status])
-        self.set_main_window_addon_status_data.emit(addon_status)
+                    # remove this addon since it no longer exists
+                    self._wow_helper.delete_addon(addon['name'])
+                elif version_int < latest_version and (self._api.get_is_premium() or self._settings.tsm3_beta):
+                    # update this addon
+                    self._download_addon(addon['name'], "beta" if self._settings.tsm3_beta else "release")
 
-        # update addons
-        for name in addon_updates:
-            # TODO: do the update
-            pass
+        # update addon status again incase we changed something (i.e. downloaded updates or deleted an old addon)
+        self._update_addon_status()
 
         # check realm data (AuctionDB / Shopping / WoWuction) status
         for realm in result['realms']:
             pass
 
 
+    def _update_addon_status(self):
+        # check addon versions
+        addon_status = []
+        for addon in self._addon_versions:
+            name = addon['name']
+            latest_version = addon['betaVersion'] if self._settings.tsm3_beta else addon['version']
+            version_type, version_int, version_str = self._wow_helper.get_installed_version(name)
+            status = None
+            if version_type == WoWHelper.INVALID_VERSION:
+                status = {'text':"Not installed (double-click to install)", 'click_enabled':True, 'click_key':"addon~{}~{}".format(name, "beta" if self._settings.tsm3_beta else "release")}
+            elif version_type in [WoWHelper.RELEASE_VERSION, WoWHelper.BETA_VERSION]:
+                if latest_version == 0:
+                    # this addon no longer exists, so it will be uninstalled
+                    status = {'text':"Removing..."}
+                elif version_int < latest_version:
+                    # this addon needs to be updated
+                    if self._api.get_is_premium() or self._settings.tsm3_beta:
+                        # defer the auto-updating until after we set the status
+                        status = {'text':"Updating..."}
+                    else:
+                        status = {'text':"Update available. Go premium for auto-updates.", 'color':[255, 0, 0]}
+                else:
+                    status = {'text':"Up to date."}
+            elif version_type == WoWHelper.DEV_VERSION:
+                status = {'text':"Automatic updates disabled"}
+            else:
+                raise Exception("Unexpected version type for {} ({}): {}".format(addon['name'], version_str, version_type))
+            if status:
+                addon_status.append([{'text':name}, {'text':version_str}, status])
+        self.set_main_window_addon_status_data.emit(addon_status)
+
+
+    def _run_fsm(self):
+        sleep_time = 0
+        if self._state == self.State.INIT:
+            # just go to the next state - this is so we can show the login window when we enter LOGGED_OUT
+            self._set_fsm_state(self.State.LOGGED_OUT)
+        elif self._state == self.State.LOGGED_OUT:
+            # process login requests (which will move us to VALID_SESSION)
+            self._login()
+        elif self._state == self.State.PENDING_NEW_SESSION:
+            # get a new session by making a login request (which will move us to VALID_SESSION)
+            if self._login_request():
+                # we failed to login, wait before trying again
+                sleep_time = Config.STATUS_CHECK_INTERVAL_S
+        elif self._state == self.State.VALID_SESSION:
+            # make a status request and move on to SLEEPING (even if it fails)
+            if self._settings.wow_path != "":
+                self._check_status()
+            self._set_fsm_state(self.State.SLEEPING)
+            sleep_time = Config.STATUS_CHECK_INTERVAL_S
+        elif self._state == self.State.SLEEPING:
+            # go back to PENDING_NEW_SESSION
+            self._set_fsm_state(self.State.PENDING_NEW_SESSION)
+        else:
+            raise Exception("Invalid state {}".format(self._state))
+        self._sleep_time = sleep_time
+        while self._sleep_time > 0:
+            self._sleep_time -= 1
+            self.sleep(1)
+
+
     def run(self):
         while True:
-            if self._state == self.State.INIT:
-                # just go to the next state - this is so we can show the login window when we enter LOGGED_OUT
-                self._set_fsm_state(self.State.LOGGED_OUT)
-            elif self._state == self.State.LOGGED_OUT:
-                # process login requests (which will move us to VALID_SESSION)
-                self._login()
-            elif self._state == self.State.PENDING_NEW_SESSION:
-                # get a new session by making a login request (which will move us to VALID_SESSION)
-                self._login_request()
-            elif self._state == self.State.VALID_SESSION:
-                # make a status request and move on to SLEEPING (even if it fails)
-                if self._settings.wow_path != "":
-                    self._check_status()
-                self._set_fsm_state(self.State.SLEEPING)
-            elif self._state == self.State.SLEEPING:
-                # go to sleep and then go back to PENDING_NEW_SESSION
-                self.sleep(60)
-                self._set_fsm_state(self.State.PENDING_NEW_SESSION)
-                # sync_status = [
-                    # ('US Region', 'Updated 2 minutes ago', 'Updated 14 hours ago', 'Updated 2 minutes ago'),
-                    # ('Tichondrius', 'Updated 2 minutes ago', 'Updated 14 hours ago', 'Updated 2 minutes ago'),
-                    # ('Dunemaul', 'Updated 2 minutes ago', 'Updated 14 hours ago', 'Updated 2 minutes ago'),
-                    # ('Chromaggus', 'Updated 2 minutes ago', 'Updated 14 hours ago', 'Updated 2 minutes ago'),
-                    # ('Illidan', 'Updated 2 minutes ago', 'Updated 14 hours ago', 'Updated 2 minutes ago'),
-                # ]
-                # self.set_main_window_sync_status_data.emit(sync_status)
-                # self.sleep(300)
-            else:
-                raise Exception("Invalid state {}".format(self._state))
+            self._run_fsm()

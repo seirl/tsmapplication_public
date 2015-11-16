@@ -26,6 +26,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox
 
 
 class MainWindow(QMainWindow):
+    settings_button_clicked = pyqtSignal()
     addon_status_table_clicked = pyqtSignal(str)
 
 
@@ -40,6 +41,7 @@ class MainWindow(QMainWindow):
 
         # connect signals / slots
         self._ui.addon_status_table.doubleClicked.connect(self._addon_status_table_clicked)
+        self._ui.settings_button.clicked.connect(self.settings_button_clicked.emit)
 
         # Apply the stylesheet
         file = QFile(":/resources/main_window.css")

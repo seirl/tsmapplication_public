@@ -23,7 +23,7 @@ QMainWindow {
 
 /* text */
 QLabel {
-	color : white;
+	color: white;
 }
 QWidget[id="headerText"] QLabel {
 	color: rgb(153, 255, 255);

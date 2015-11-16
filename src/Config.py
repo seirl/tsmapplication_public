@@ -19,6 +19,8 @@ ORG_NAME = "TradeSkillMaster"
 APP_NAME = "TSMApplication"
 CURRENT_VERSION = 300
 LOG_FILE_NAME = "TSMApplication.log"
+STATUS_CHECK_INTERVAL_S = 10 * 60
+APP_API_BASE_URL = "http://old-app-server.tradeskillmaster.com/app"
 
 # Default settings
 DEFAULT_SETTINGS = {
@@ -28,6 +30,11 @@ DEFAULT_SETTINGS = {
     'accepted_terms': False,
     'wow_path': "",
     'tsm3_beta': False,
+    'has_beta_access': False,
+    'run_at_startup': True,
+    'start_minimized': False,
+    'minimize_to_tray': True,
+    'confirm_exit': True,
 }
 DEFAULT_OLD_LOGIN_SETTINGS = {
     'userId': 0,

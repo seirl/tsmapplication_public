@@ -18,6 +18,7 @@
 /* main window */
 QMainWindow {
 	background-color: rgb(11, 11, 11);
+	color: white;
 }
 
 
@@ -47,4 +48,34 @@ QToolButton:disabled {
 	background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 rgb(124, 30, 0), stop: 0.5 rgb(110, 50, 0), stop: 1 rgb(124, 30, 0));
 	border: 1px solid rgb(115, 50, 0);
 	color: rgb(150, 150, 150);
+}
+
+
+/* tab bar */
+QTabWidget::tab-bar {
+	left: 5px; /* move to the right by 5px */
+}
+QTabBar::tab {
+	background: rgb(35, 35, 35);
+	border: 0px 0px 0px 0px;
+	min-width: 80px;
+	min-height: 20px;
+	padding: 2px 5px 2px 5px;
+	margin: 0px 0px 0px 3px;
+	color: white;
+}
+QTabBar::tab:hover:!selected {
+	background: rgb(100, 100, 100);
+}
+
+QTabBar::tab:!hover:!selected {
+	background: rgb(70, 70, 70);
+	padding-top: 5px;
+}
+
+
+/* tab contents */
+QTabWidget::pane {
+	border: none; /* for some reason this is necessary in order to change anything else */
+	background-color: rgb(35, 35, 35);
 }

@@ -26,7 +26,11 @@ def load_settings(items, *args, **kargs):
 
     def init_item(key, default):
         def get(self):
-            return self.settings.value(key, default)
+            value = self.settings.value(key, default)
+            if isinstance(value, str) and isinstance(default, bool):
+                return value == "true"
+            else:
+                return value
         get.__name__ = key
 
         def set(self, value):
