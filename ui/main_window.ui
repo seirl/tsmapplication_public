@@ -118,11 +118,11 @@
     <item>
      <widget class="QTabWidget" name="main_tabs">
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="addon_data_tab">
        <attribute name="title">
-        <string>Addon Data</string>
+        <string>Realm Data</string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>

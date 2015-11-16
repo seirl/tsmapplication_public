@@ -36,6 +36,7 @@ _DEFAULT_USER_INFO = {
     'name': "",
     'isBeta': False,
     'isPremium': False,
+    'wowuction': None,
 }
 
 
@@ -134,11 +135,36 @@ class AppAPI:
 
 
     def status(self):
-        return self._make_request("status")
+        result = self._make_request("status")
+        self._user_info['wowuction'] = {}
+        self._user_info['wowuction']['region'] = result['wowuction']['region']
+        self._user_info['wowuction']['token'] = result['wowuction']['token']
+        self._user_info['wowuction']['tokenTime'] = result['wowuction']['tokenTime']
+        return result
 
 
     def addon(self, name, version):
         return self._make_request("addon", name, version)
+
+
+    def auctiondb(self, realm_ids):
+        return self._make_request("auctiondb", "-".join([str(x) for x in realm_ids]))
+
+
+    def shopping(self, realm_ids):
+        return self._make_request("shopping", "-".join([str(x) for x in realm_ids]))
+
+
+    def wowuction_region(self, realm_slug=None):
+        if realm_slug:
+            # realm data
+            params = [self._user_info['wowuction']['region'], realm_slug, self._user_info['wowuction']['token'], self._user_info['wowuction']['tokenTime'], self._user_info['userId']]
+            url = "http://www.wowuction.com/{}/{}/horde/Tools/GetTSMDataStatic?token={}&app=tsm&version=4&realmdata=false&regiondata=true&both=true&time={}&tsmuserid={}".format(*params)
+        else:
+            # region data
+            params = [self._user_info['wowuction']['region'], self._user_info['wowuction']['token'], self._user_info['wowuction']['tokenTime'], self._user_info['userId']]
+            url = "http://www.wowuction.com/{}/aegwynn/horde/Tools/GetTSMDataStatic?token={}&app=tsm&version=4&realmdata=false&regiondata=true&both=true&time={}&tsmuserid={}".format(*params)
+        print(url)
 
 
     def log(self, data):

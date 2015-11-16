@@ -15,6 +15,7 @@
 
 
 # Local modules
+from AppData import AppData
 import Config
 from Settings import load_settings
 
@@ -25,6 +26,7 @@ from PyQt5.QtCore import pyqtSignal, QFileSystemWatcher, QObject, QTimer
 import logging
 import os
 from shutil import rmtree
+from time import time
 
 
 class WoWHelper(QObject):
@@ -141,3 +143,7 @@ class WoWHelper(QObject):
         # remove the addon if it already exists
         self.delete_addon(addon)
         zip.extractall(self._get_addon_path())
+
+
+    def get_app_data(self):
+        return AppData(os.path.join(self._get_addon_path("TradeSkillMaster_AppHelper"), "AppData.lua"))

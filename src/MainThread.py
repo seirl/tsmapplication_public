@@ -22,7 +22,7 @@ from Settings import load_settings
 from WoWHelper import WoWHelper
 
 # PyQt5
-from PyQt5.QtCore import pyqtSignal, QMutex, QSettings, QThread, QVariant, QWaitCondition, Qt
+from PyQt5.QtCore import pyqtSignal, QDateTime, QMutex, QSettings, QThread, QVariant, QWaitCondition, Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QMessageBox
 
@@ -118,6 +118,7 @@ class MainThread(QThread):
         self._state = self.State.INIT
         self._sleep_time = 0
         self._addon_versions = []
+        self._data_sync_status = {}
 
 
     def _wait_for_event(self, event):
@@ -220,7 +221,7 @@ class MainThread(QThread):
         elif new_state == self.State.PENDING_NEW_SESSION:
             pass
         elif new_state == self.State.VALID_SESSION:
-            self._settings.has_beta_access = self._api.get_is_premium()
+            self._settings.has_beta_access = self._api.get_is_premium() or self._api.get_is_beta()
             self.settings_changed.emit()
         elif new_state == self.State.SLEEPING:
             pass
@@ -275,6 +276,7 @@ class MainThread(QThread):
             result = self._api.status()
         except (ApiError, ApiTransientError) as e:
             self._logger.error("Got error from status API: {}".format(str(e)))
+            return
 
         # update addon status
         self._addon_versions = result['addons']
@@ -296,8 +298,58 @@ class MainThread(QThread):
         self._update_addon_status()
 
         # check realm data (AuctionDB / Shopping / WoWuction) status
-        for realm in result['realms']:
-            pass
+        app_data = self._wow_helper.get_app_data()
+        auctiondb_updates = []
+        shopping_updates = []
+        wowuction_updates = []
+        self._data_sync_status = {}
+        for info in result['realms']:
+            self._data_sync_status[info['name']] = {
+                'id': info['id'],
+                'auctiondb': info['lastModified'] if info['auctiondb'] else 0,
+                'shopping': info['lastModified'] if info['name'] != "Global" and self._api.get_is_premium() else 0,
+                'wowuction': result['wowuction']['lastModified'] if info['wowuction'] else 0,
+            }
+        self._update_data_sync_status()
+        for realm_name, info in self._data_sync_status.items():
+            if info['auctiondb'] > app_data.last_update("AUCTIONDB_MARKET_DATA", realm_name):
+                auctiondb_updates.append(info['id'])
+            if info['shopping'] > app_data.last_update("SHOPPING_SEARCHES", realm_name):
+                shopping_updates.append(info['id'])
+            if info['wowuction'] > app_data.last_update("WOWUCTION_MARKET_DATA", realm_name):
+                wowuction_updates.append(info['id'])
+
+        hit_error = False
+        if auctiondb_updates:
+            # get auctiondb updates (all at once)
+            try:
+                for auctiondb_data in self._api.auctiondb(auctiondb_updates)['data']:
+                    for realm_id in auctiondb_data['realms']:
+                        realm_name, last_modified = next((x['name'], x['lastModified']) for x in result['realms'] if x['id'] == realm_id)
+                        assert(realm_name)
+                        app_data.update("AUCTIONDB_MARKET_DATA", realm_name, auctiondb_data['data'], last_modified)
+            except (ApiError, ApiTransientError) as e:
+                # log an error and keep going
+                self._logger.error("Got error from AuctionDB API: {}".format(str(e)))
+                hit_error = True
+        if shopping_updates:
+            # get shopping updates (all at once)
+            try:
+                for auctiondb_data in self._api.shopping(shopping_updates)['data']:
+                    for realm_id in auctiondb_data['realms']:
+                        realm_name, last_modified = next((x['name'], x['lastModified']) for x in result['realms'] if x['id'] == realm_id)
+                        assert(realm_name)
+                        app_data.update("SHOPPING_SEARCHES", realm_name, auctiondb_data['data'], last_modified)
+            except (ApiError, ApiTransientError) as e:
+                # log an error and keep going
+                self._logger.error("Got error from Shopping API: {}".format(str(e)))
+                hit_error = True
+        self._api.wowuction_region()
+        self._api.wowuction_region("tichondrius")
+        app_data.save()
+        self._update_data_sync_status()
+        if not hit_error:
+            self.set_main_window_header_text.emit("Welcome, {}!\nEverything is up to date as of {}.".format(self._api.get_username(), QDateTime.currentDateTime().toString(Qt.SystemLocaleShortDate)))
 
 
     def _update_addon_status(self):
@@ -309,27 +361,60 @@ class MainThread(QThread):
             version_type, version_int, version_str = self._wow_helper.get_installed_version(name)
             status = None
             if version_type == WoWHelper.INVALID_VERSION:
-                status = {'text':"Not installed (double-click to install)", 'click_enabled':True, 'click_key':"addon~{}~{}".format(name, "beta" if self._settings.tsm3_beta else "release")}
+                status = {'text': "Not installed (double-click to install)", 'click_enabled':True, 'click_key':"addon~{}~{}".format(name, "beta" if self._settings.tsm3_beta else "release")}
             elif version_type in [WoWHelper.RELEASE_VERSION, WoWHelper.BETA_VERSION]:
                 if latest_version == 0:
                     # this addon no longer exists, so it will be uninstalled
-                    status = {'text':"Removing..."}
+                    status = {'text': "Removing..."}
                 elif version_int < latest_version:
                     # this addon needs to be updated
                     if self._api.get_is_premium() or self._settings.tsm3_beta:
                         # defer the auto-updating until after we set the status
-                        status = {'text':"Updating..."}
+                        status = {'text': "Updating..."}
                     else:
-                        status = {'text':"Update available. Go premium for auto-updates.", 'color':[255, 0, 0]}
+                        status = {'text': "Update available. Go premium for auto-updates.", 'color':[255, 0, 0]}
                 else:
-                    status = {'text':"Up to date."}
+                    status = {'text': "Up to date"}
             elif version_type == WoWHelper.DEV_VERSION:
-                status = {'text':"Automatic updates disabled"}
+                status = {'text': "Automatic updates disabled"}
             else:
                 raise Exception("Unexpected version type for {} ({}): {}".format(addon['name'], version_str, version_type))
             if status:
-                addon_status.append([{'text':name}, {'text':version_str}, status])
+                addon_status.append([{'text': name}, {'text': version_str}, status])
         self.set_main_window_addon_status_data.emit(addon_status)
+
+
+    def _update_data_sync_status(self):
+        app_data = self._wow_helper.get_app_data()
+        # check data sync status versions
+        sync_status = []
+        for realm_name, info in self._data_sync_status.items():
+            if info['auctiondb'] == 0:
+                # they don't have AuctionDB data enabled for this realm
+                auctiondb_status = {'text': "Disabled"}
+            elif info['auctiondb'] > app_data.last_update("AUCTIONDB_MARKET_DATA", realm_name):
+                # an update is pending
+                auctiondb_status = {'text': "Updating..."}
+            else:
+                auctiondb_status = {'text': "Up to date"}
+            if info['wowuction'] == 0:
+                # they don't have WoWuction data enabled for this realm
+                wowuction_status = {'text': "Disabled"}
+            elif info['wowuction'] > app_data.last_update("WOWUCTION_MARKET_DATA", realm_name):
+                # an update is pending
+                wowuction_status = {'text': "Updating..."}
+            else:
+                wowuction_status = {'text': "Up to date"}
+            if info['shopping'] == 0:
+                # they aren't premium so don't get shopping data
+                shopping_status = {'text': "N/A"} if realm_name == "Global" else {'text': "Go premium to enabled"}
+            elif info['shopping'] > app_data.last_update("SHOPPING_SEARCHES", realm_name):
+                # an update is pending
+                shopping_status = {'text': "Updating..."}
+            else:
+                shopping_status = {'text': "Up to date"}
+            sync_status.append([{'text': realm_name}, auctiondb_status, wowuction_status, shopping_status])
+        self.set_main_window_sync_status_data.emit(sync_status)
 
 
     def _run_fsm(self):
