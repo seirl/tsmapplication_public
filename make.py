@@ -25,7 +25,10 @@ import sys
 import shutil
 
 
-# what commands to run by default
+# a list of all supported operations
+SUPPORTED_OPERATIONS = ["clean", "build", "run", "package"]
+
+# what operations to run by default
 DEFAULT_OPERATIONS = ["clean", "build", "run"]
 
 # folders where to look for source files
@@ -47,6 +50,10 @@ def find_files(dir, pattern):
 
             
 class Operations:
+    @staticmethod
+    def __dir__():
+        return ['clean', 'build', 'run', 'package']
+
     @staticmethod
     def clean():
         # delete the build directory
@@ -89,13 +96,12 @@ class Operations:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("operation", nargs="*", default=DEFAULT_OPERATIONS,
-                        help="Specifies which operation(s) to perform. If not specified, will run 'clean build run'.")
+                        help="Specifies which operation(s) to perform. If not specified, will run '{}'. Supported operations are {}"
+                             .format(" ".join(DEFAULT_OPERATIONS), ", ".join(["'{}'".format(x) for x in SUPPORTED_OPERATIONS])))
     args = parser.parse_args()
     # check that all the operations are valid (cause argparse can't easily do this for us in this case)
     for op in args.operation:
-        try:
-            getattr(Operations, op)
-        except AttributeError:
+        if op not in SUPPORTED_OPERATIONS:
             print("Invalid operation: {}".format(op))
             sys.exit(1)
 

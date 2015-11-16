@@ -10,8 +10,8 @@ The TSM App is written using the following software:
  - Python 3.4.3
  - PyQt 5.5.1
 
-In the root of the repository is a `make.py` script which implements a very basic system. Simply running it without any
-arguments will build and run the application.
+In the root of the repository is a `make.py` script which implements a very basic build system. Simply running it without
+any arguments will build and run the application.
 
 ## License
 
@@ -20,11 +20,7 @@ The TSM Desktop Application is licensed under version 3 of the
 detailed below.
 
 This application uses TradeSkillMaster App APIs. You are permitted to use the TSM App APIs through an unmodified,
-officially-released version of this application. You are are also permitted to use the TSM App APIs in a modified
-version of this works for the purpose of contributing modifications back to the official repository in accordance with
-the license as long as doing so does not violate the
-[TradeSkillMaster Terms of Use / Privacy Policy](https://www.tradeskillmaster.com/site/terms). Any other usage of the
-TSM App APIs is strictly forbidden.
+officially-released version of this application only. Any other usage of the TSM App APIs is strictly forbidden.
 
 Also, the TradeSkillMaster logo is property of TradeSkillMaster and may not be used for purposes which are not
-explicitly condoned by the TradeSkillMaster team.
+explicitly permitted by the TradeSkillMaster team.
