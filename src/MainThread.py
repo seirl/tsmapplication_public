@@ -326,7 +326,6 @@ class MainThread(QThread):
                 for auctiondb_data in self._api.auctiondb(auctiondb_updates)['data']:
                     for realm_id in auctiondb_data['realms']:
                         realm_name, last_modified = next((x['name'], x['lastModified']) for x in result['realms'] if x['id'] == realm_id)
-                        assert(realm_name)
                         app_data.update("AUCTIONDB_MARKET_DATA", realm_name, auctiondb_data['data'], last_modified)
             except (ApiError, ApiTransientError) as e:
                 # log an error and keep going
@@ -335,17 +334,36 @@ class MainThread(QThread):
         if shopping_updates:
             # get shopping updates (all at once)
             try:
-                for auctiondb_data in self._api.shopping(shopping_updates)['data']:
-                    for realm_id in auctiondb_data['realms']:
+                for shopping_data in self._api.shopping(shopping_updates)['data']:
+                    for realm_id in shopping_data['realms']:
                         realm_name, last_modified = next((x['name'], x['lastModified']) for x in result['realms'] if x['id'] == realm_id)
-                        assert(realm_name)
-                        app_data.update("SHOPPING_SEARCHES", realm_name, auctiondb_data['data'], last_modified)
+                        app_data.update("SHOPPING_SEARCHES", realm_name, shopping_data['data'], last_modified)
             except (ApiError, ApiTransientError) as e:
                 # log an error and keep going
                 self._logger.error("Got error from Shopping API: {}".format(str(e)))
                 hit_error = True
-        self._api.wowuction_region()
-        self._api.wowuction_region("tichondrius")
+        if wowuction_updates:
+            # get wowuction updates
+            try:
+                for realm_id in wowuction_updates:
+                    realm_name, realm_slug = next((x['name'], x['slug']) for x in result['realms'] if x['id'] == realm_id)
+                    last_modified = result['wowuction']['lastModified']
+                    if realm_name == "Global":
+                        raw_data = self._api.wowuction()
+                        data = raw_data['regionData']
+                    else:
+                        raw_data = self._api.wowuction(realm_slug)
+                        data = raw_data['realmData']
+                    fields = ["\"{}\"".format(x) for x in data['fields']]
+                    data = data['horde']
+                    # time for some beautiful python goodness...this basically just converts a python list of lists into a stringified lua list of lists
+                    data = "{{{}}}".format(",".join(["{{{}}}".format(",".join([str(x) for x in item])) for item in data]))
+                    processed_data = "{{downloadTime={},fields={{{}}},data={}}}".format(last_modified, ",".join(fields), data)
+                    app_data.update("WOWUCTION_MARKET_DATA", realm_name, processed_data, last_modified)
+            except (ApiError, ApiTransientError) as e:
+                # log an error and keep going
+                self._logger.error("Got error from WoWuction API: {}".format(str(e)))
+                hit_error = True
         app_data.save()
         self._update_data_sync_status()
         if not hit_error:

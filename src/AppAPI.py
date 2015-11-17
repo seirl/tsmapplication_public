@@ -59,6 +59,7 @@ class AppAPI:
 
     def _make_request(self, *args, **kwargs):
         data = kwargs.pop('data', None)
+        alt_url = kwargs.pop('alt_url', None)
         assert(not kwargs)
         headers = {
             'Accept-Encoding': 'gzip',
@@ -72,13 +73,16 @@ class AppAPI:
             headers['Content-Type'] = "text/plain"
             headers['Content-Encoding'] = "gzip"
         current_time = int(time())
-        query_params = {
-            'session': self._user_info['session'],
-            'version': Config.CURRENT_VERSION,
-            'time': current_time,
-            'token': sha256("{}:{}:{}".format(Config.CURRENT_VERSION, current_time, PrivateConfig.get_token_salt()).encode("utf-8")).hexdigest()
-        }
-        url = "{}/{}?{}".format(Config.APP_API_BASE_URL, "/".join(args), urlencode(query_params))
+        if alt_url:
+            url = alt_url
+        else:
+            query_params = {
+                'session': self._user_info['session'],
+                'version': Config.CURRENT_VERSION,
+                'time': current_time,
+                'token': sha256("{}:{}:{}".format(Config.CURRENT_VERSION, current_time, PrivateConfig.get_token_salt()).encode("utf-8")).hexdigest()
+            }
+            url = "{}/{}?{}".format(Config.APP_API_BASE_URL, "/".join(args), urlencode(query_params))
         logger = logging.getLogger()
         logger.debug("Making request: {}".format(url))
         try:
@@ -88,7 +92,15 @@ class AppAPI:
                 if response.info().get("Content-Encoding") == "gzip":
                     with GzipFile(fileobj=BytesIO(raw_data), mode="rb") as f:
                         raw_data = f.read()
-                if content_type == "application/zip":
+                if alt_url and content_type == "text/plain":
+                    # wowuction doesn't set the content type header correctly
+                    raw_data = raw_data.decode(response.info().get_param("charset", "utf-8"))
+                    try:
+                        return json.loads(raw_data)
+                    except ValueError:
+                        # it was probably an error
+                        raise ApiTransientError()
+                elif content_type == "application/zip":
                     return raw_data
                 elif content_type == "application/json":
                     raw_data = raw_data.decode(response.info().get_param("charset", "utf-8"))
@@ -97,7 +109,7 @@ class AppAPI:
                         # the data is invalid
                         logger.error("Invalid data: '{}'".format(raw_data))
                         raise ApiTransientError()
-                    elif not data.pop("success", False):
+                    elif not alt_url and not data.pop("success", False):
                         # this request failed and we got an error back
                         raise ApiError(data['error'])
                     # this request was successful
@@ -155,16 +167,16 @@ class AppAPI:
         return self._make_request("shopping", "-".join([str(x) for x in realm_ids]))
 
 
-    def wowuction_region(self, realm_slug=None):
+    def wowuction(self, realm_slug=None):
         if realm_slug:
             # realm data
             params = [self._user_info['wowuction']['region'], realm_slug, self._user_info['wowuction']['token'], self._user_info['wowuction']['tokenTime'], self._user_info['userId']]
-            url = "http://www.wowuction.com/{}/{}/horde/Tools/GetTSMDataStatic?token={}&app=tsm&version=4&realmdata=false&regiondata=true&both=true&time={}&tsmuserid={}".format(*params)
+            url = "http://www.wowuction.com/{}/{}/horde/Tools/GetTSMDataStatic?token={}&app=tsm&version=4&realmdata=true&regiondata=false&time={}&tsmuserid={}".format(*params)
         else:
             # region data
             params = [self._user_info['wowuction']['region'], self._user_info['wowuction']['token'], self._user_info['wowuction']['tokenTime'], self._user_info['userId']]
-            url = "http://www.wowuction.com/{}/aegwynn/horde/Tools/GetTSMDataStatic?token={}&app=tsm&version=4&realmdata=false&regiondata=true&both=true&time={}&tsmuserid={}".format(*params)
-        print(url)
+            url = "http://www.wowuction.com/{}/aegwynn/horde/Tools/GetTSMDataStatic?token={}&app=tsm&version=4&realmdata=false&regiondata=true&time={}&tsmuserid={}".format(*params)
+        return self._make_request(alt_url=url)
 
 
     def log(self, data):
