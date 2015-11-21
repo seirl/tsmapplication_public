@@ -23,7 +23,8 @@ from ui.MainWindow import MainWindow
 from ui.SettingsWindow import SettingsWindow
 
 # PyQt5
-from PyQt5.QtCore import QObject, Qt
+from PyQt5.QtCore import pyqtSignal, QObject, Qt
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox
 
 # General python modules
@@ -35,6 +36,9 @@ import sys
 
 
 class TSMApp(QObject):
+    terms_accepted = pyqtSignal()
+
+
     def __init__(self):
         QObject.__init__(self)
         # Create the QApplication
@@ -72,22 +76,43 @@ class TSMApp(QObject):
         # connect main window signals / slots
         self._main_window.settings_button_clicked.connect(self._settings_window.show)
         self._main_window.addon_status_table_clicked.connect(self._main_thread.addon_status_table_clicked, Qt.QueuedConnection)
+        self._main_window.accounting_account_selected.connect(self._main_thread.accounting_account_selected)
         self._main_thread.set_main_window_visible.connect(self._main_window.setVisible)
         self._main_thread.set_main_window_header_text.connect(self._main_window._ui.header_text.setText)
         self._main_thread.set_main_window_sync_status_data.connect(self._main_window.set_sync_status_data)
         self._main_thread.set_main_window_addon_status_data.connect(self._main_window.set_addon_status_data)
+        self._main_thread.set_main_window_accounting_accounts.connect(self._main_window.set_accounting_accounts)
         # connect settings window signals / slots
         self._settings_window.settings_changed.connect(self._main_thread.on_settings_changed)
         self._settings_window.upload_log_file.connect(self._main_thread.upload_log_file)
+        self._settings_window.reset_settings.connect(self._main_thread.reset_settings)
         self._main_thread.settings_changed.connect(self._settings_window.on_settings_changed)
         self._main_thread.log_uploaded.connect(self._settings_window.log_uploaded)
         # connect general signals / slots
         self._main_thread.finished.connect(self._app.exit)
+        self._main_thread.show_terms.connect(self.show_terms)
+        self.terms_accepted.connect(self._main_thread.terms_accepted)
         # start the thread
         self._main_thread.start()
 
         # Start the app
         self._app.exec_()
+
+
+    def show_terms(self):
+        msg_box = QMessageBox()
+        msg_box.setWindowIcon(QIcon(":/resources/logo.png"))
+        msg_box.setWindowModality(Qt.ApplicationModal)
+        msg_box.setIcon(QMessageBox.Warning)
+        msg_box.setText("TradeSkillMaster Application Terms of Use")
+        msg_box.setTextFormat(Qt.RichText)
+        msg_box.setInformativeText("By clicking 'OK' you are agreeing to the <a href='http://www.tradeskillmaster.com/site/terms'>TSM Terms of Use</a>.<br>If you do not accept the terms, click cancel to close the application.")
+        msg_box.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+        msg_box.setDefaultButton(QMessageBox.Cancel)
+        if msg_box.exec_() != QMessageBox.Ok:
+            # They didn't accept, so exit
+            sys.exit(0)
+        self.terms_accepted.emit()
 
 
 if __name__ == "__main__":

@@ -29,8 +29,9 @@ import os
 
 
 class SettingsWindow(QMainWindow):
-    settings_changed = pyqtSignal()
+    settings_changed = pyqtSignal(str)
     upload_log_file = pyqtSignal()
+    reset_settings = pyqtSignal()
 
 
     def __init__(self, parent):
@@ -50,6 +51,7 @@ class SettingsWindow(QMainWindow):
         self._ui.upload_log_button.clicked.connect(self.upload_log_button_clicked)
         self._ui.done_button.clicked.connect(self.hide)
         self._ui.wow_dir_browse_button.clicked.connect(self.wow_dir_button_clicked)
+        self._ui.reset_button.clicked.connect(self.reset_button_clicked)
         self._settings_widgets = {
             'run_at_startup': self._ui.run_at_startup_checkbox,
             'start_minimized': self._ui.start_minimized_checkbox,
@@ -119,6 +121,11 @@ class SettingsWindow(QMainWindow):
         self._ui.upload_log_button.setText("Uploading...")
         # slight delay so the button gets disabled
         QTimer.singleShot(1, self.upload_log_file.emit)
+
+
+    def reset_button_clicked(self):
+        self.hide()
+        self.reset_settings.emit()
 
 
     def log_uploaded(self, success):

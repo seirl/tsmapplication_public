@@ -23,8 +23,6 @@ from WoWHelper import WoWHelper
 
 # PyQt5
 from PyQt5.QtCore import pyqtSignal, QDateTime, QMutex, QSettings, QThread, QVariant, QWaitCondition, Qt
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QMessageBox
 
 # General python modules
 from enum import Enum
@@ -41,6 +39,7 @@ class MainThread(QThread):
     class WaitEvent(Enum):
         NONE = 0
         LOGIN_BUTTON = 1
+        TERMS_ACCEPTED = 2
 
 
     class State(Enum):
@@ -69,13 +68,14 @@ class MainThread(QThread):
     set_login_window_visible = pyqtSignal(bool)
     set_login_window_enabled = pyqtSignal(bool)
     set_login_window_form_values = pyqtSignal(str, str)
-    get_login_window_form_values = pyqtSignal()
     set_login_window_button_text = pyqtSignal(str)
     set_login_window_error_text = pyqtSignal(str)
+    show_terms = pyqtSignal()
     set_main_window_visible = pyqtSignal(bool)
     set_main_window_header_text = pyqtSignal(str)
     set_main_window_sync_status_data = pyqtSignal(list)
     set_main_window_addon_status_data = pyqtSignal(list)
+    set_main_window_accounting_accounts = pyqtSignal(list)
     settings_changed = pyqtSignal()
     log_uploaded = pyqtSignal(bool)
 
@@ -142,6 +142,10 @@ class MainThread(QThread):
         self._wait_condition.wakeAll()
 
 
+    def terms_accepted(self):
+        self._fire_wait_event(self.WaitEvent.TERMS_ACCEPTED)
+
+
     def login_button_clicked(self, email, password):
         self._fire_wait_event(self.WaitEvent.LOGIN_BUTTON, (email, password))
 
@@ -156,6 +160,11 @@ class MainThread(QThread):
             raise Exception("Invalid table: {}".format(click_key))
 
 
+    def accounting_account_selected(self, account):
+        if account != "":
+            self._wow_helper.get_accounting_data_object(account).get_realms()
+
+
     def upload_log_file(self):
         with open(Config.LOG_FILE_NAME) as log_file:
             data = log_file.read()
@@ -166,10 +175,17 @@ class MainThread(QThread):
             self.log_uploaded.emit(False)
 
 
-    def on_settings_changed(self):
-        if not self._wow_helper.has_valid_wow_path() and self._wow_helper.set_wow_path(self._settings.wow_path) and self._state == self.State.SLEEPING:
+    def on_settings_changed(self, str):
+        if not self._wow_helper.has_valid_wow_path() and self._wow_helper.set_wow_path(str) and self._state == self.State.SLEEPING:
             # we just got a valid wow directory so stop sleeping
             self.stop_sleeping()
+
+
+    def reset_settings(self):
+        self._settings.settings.clear()
+        self._wow_helper.set_wow_path("")
+        self.stop_sleeping()
+        self._set_fsm_state(self.State.LOGGED_OUT)
 
 
     def stop_sleeping(self):
@@ -201,18 +217,8 @@ class MainThread(QThread):
         is_logged_out = (new_state == self.State.LOGGED_OUT)
         # show the ToU if they haven't already accepted them
         if not is_logged_out and not self._settings.accepted_terms:
-            msg_box = QMessageBox()
-            msg_box.setWindowIcon(QIcon(":/resources/logo.png"))
-            msg_box.setWindowModality(Qt.ApplicationModal)
-            msg_box.setIcon(QMessageBox.Warning)
-            msg_box.setText("TradeSkillMaster Application Terms of Use")
-            msg_box.setTextFormat(Qt.RichText)
-            msg_box.setInformativeText("By clicking 'OK' you are agreeing to the <a href='http://www.tradeskillmaster.com/site/terms'>TSM Terms of Use</a>.<br>If you do not accept the terms, click cancel to close the application.")
-            msg_box.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
-            msg_box.setDefaultButton(QMessageBox.Cancel)
-            if msg_box.exec_() != QMessageBox.Ok:
-                # They didn't accept, so exit
-                sys.exit(0)
+            self.show_terms.emit()
+            self._wait_for_event(self.WaitEvent.TERMS_ACCEPTED)
             self._settings.accepted_terms = True
         self.set_main_window_visible.emit(not is_logged_out)
         self.set_login_window_visible.emit(is_logged_out)
@@ -223,6 +229,16 @@ class MainThread(QThread):
         elif new_state == self.State.VALID_SESSION:
             self._settings.has_beta_access = self._api.get_is_premium() or self._api.get_is_beta()
             self.settings_changed.emit()
+            if old_state == self.State.LOGGED_OUT:
+                # we just logged in so clean up a few things
+                if not self._wow_helper.has_valid_wow_path():
+                    self._wow_helper.find_wow_path()
+                # reset the login window
+                self.set_login_window_enabled.emit(True)
+                self.set_login_window_button_text.emit("Login")
+                # reset the main window
+                self.set_main_window_sync_status_data.emit([])
+                self.set_main_window_addon_status_data.emit([])
         elif new_state == self.State.SLEEPING:
             pass
         else:
@@ -337,7 +353,7 @@ class MainThread(QThread):
                 for shopping_data in self._api.shopping(shopping_updates)['data']:
                     for realm_id in shopping_data['realms']:
                         realm_name, last_modified = next((x['name'], x['lastModified']) for x in result['realms'] if x['id'] == realm_id)
-                        app_data.update("SHOPPING_SEARCHES", realm_name, shopping_data['data'], last_modified)
+                        app_data.update("SHOPPING_SEARCHES", realm_name, shopping_data['data'], last_modified, True)
             except (ApiError, ApiTransientError) as e:
                 # log an error and keep going
                 self._logger.error("Got error from Shopping API: {}".format(str(e)))
@@ -449,9 +465,13 @@ class MainThread(QThread):
                 # we failed to login, wait before trying again
                 sleep_time = Config.STATUS_CHECK_INTERVAL_S
         elif self._state == self.State.VALID_SESSION:
-            # make a status request and move on to SLEEPING (even if it fails)
-            if self._settings.wow_path != "":
+            if not self._wow_helper.has_valid_wow_path():
+                self.set_main_window_header_text.emit("<font color='red'>You need to select your WoW directory in the settings!</font>")
+            else:
+                # make a status request and move on to SLEEPING (even if it fails)
                 self._check_status()
+                # update the accounting tab
+                self.set_main_window_accounting_accounts.emit(self._wow_helper.get_accounting_accounts())
             self._set_fsm_state(self.State.SLEEPING)
             sleep_time = Config.STATUS_CHECK_INTERVAL_S
         elif self._state == self.State.SLEEPING:

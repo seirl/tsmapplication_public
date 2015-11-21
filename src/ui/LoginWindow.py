@@ -37,6 +37,8 @@ class LoginWindow(QMainWindow):
         self.setWindowTitle("TSM Login - r{}".format(Config.CURRENT_VERSION))
 
         # connect signals / slots
+        self._ui.email_editbox.returnPressed.connect(self._login_button_clicked)
+        self._ui.password_editbox.returnPressed.connect(self._login_button_clicked)
         self._ui.login_button.clicked.connect(self._login_button_clicked)
 
         # Apply the stylesheet
@@ -46,7 +48,7 @@ class LoginWindow(QMainWindow):
         self.setStyleSheet(data)
 
 
-    def _login_button_clicked(self, checked):
+    def _login_button_clicked(self):
         self.login_button_clicked.emit(self._ui.email_editbox.text(), self._ui.password_editbox.text())
 
 

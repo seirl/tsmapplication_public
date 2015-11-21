@@ -254,6 +254,29 @@
        <attribute name="title">
         <string>Accounting Export</string>
        </attribute>
+       <widget class="QComboBox" name="accounting_accounts_dropdown">
+        <property name="geometry">
+         <rect>
+          <x>190</x>
+          <y>120</y>
+          <width>231</width>
+          <height>22</height>
+         </rect>
+        </property>
+       </widget>
+       <widget class="QLabel" name="label">
+        <property name="geometry">
+         <rect>
+          <x>30</x>
+          <y>130</y>
+          <width>121</width>
+          <height>20</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string>Select an Account:</string>
+        </property>
+       </widget>
       </widget>
      </widget>
     </item>

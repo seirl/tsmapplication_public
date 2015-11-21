@@ -20,7 +20,7 @@ APP_NAME = "TSMApplication"
 CURRENT_VERSION = 300
 LOG_FILE_NAME = "TSMApplication.log"
 STATUS_CHECK_INTERVAL_S = 10 * 60
-APP_API_BASE_URL = "http://old-app-server.tradeskillmaster.com/app"
+APP_API_BASE_URL = "http://app-server.tradeskillmaster.com/v1"
 
 # Default settings
 DEFAULT_SETTINGS = {

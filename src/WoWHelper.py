@@ -16,6 +16,7 @@
 
 # Local modules
 from AppData import AppData
+from AccountingData import AccountingData
 import Config
 from Settings import load_settings
 
@@ -26,6 +27,7 @@ from PyQt5.QtCore import pyqtSignal, QFileSystemWatcher, QObject, QTimer
 import logging
 import os
 from shutil import rmtree
+import sys
 from time import time
 
 
@@ -44,12 +46,17 @@ class WoWHelper(QObject):
         self._watcher = QFileSystemWatcher()
         self._watcher.fileChanged.connect(self.directory_changed)
         self._watcher.directoryChanged.connect(self.directory_changed)
+        # initialize instances variables
+        self._accounting_data = []
         self._addons_folder_change_scheduled = False
         self._valid_wow_path = False
         self._settings = load_settings(Config.DEFAULT_SETTINGS)
+
+        # load the WoW path
+        self.set_wow_path("")
         if not self.set_wow_path(self._settings.wow_path):
             # try to automatically determine the wow path
-            pass
+            self.find_wow_path()
 
 
     def _get_addon_path(self, addon=None):
@@ -62,6 +69,30 @@ class WoWHelper(QObject):
     def _addons_folder_changed_delayed(self):
         self._addons_folder_change_scheduled = False
         self.addons_folder_changed.emit()
+
+
+    def find_wow_path(self):
+        if sys.platform.startswith("win32"):
+            import string
+            from ctypes import windll
+
+            search_paths = []
+            bitmask = windll.kernel32.GetLogicalDrives()
+            for drive in ["{}:\\".format(c) for i, c in enumerate(string.ascii_uppercase) if bitmask & (1 << i)]:
+                try:
+                    if windll.kernel32.GetDriveTypeW(drive) == 3: # magic number for the "fixed" drive type
+                        for sub_path in ["", "Games", "Program Files", "Program Files (x86)"]:
+                            search_paths.append(os.path.join(drive, sub_path, "World of Warcraft"))
+                except Exception as e:
+                    logging.getLogger().error("Could not lookup drive type for '{}' ({})".format(drive, str(e)))
+        elif sys.platform.startswith("darwin"):
+            search_paths = [os.path.join("~/Applications", "World of Warcraft")]
+        else:
+            logging.getLogger().error("Unsupported platform ({})".format(sys.platform))
+            return
+        for path in search_paths:
+            if self.set_wow_path(path):
+                return
 
 
     def directory_changed(self, path):
@@ -77,13 +108,24 @@ class WoWHelper(QObject):
             if self._settings.wow_path != "":
                 self._watcher.removePath(self._get_addon_path())
             self._settings.wow_path = ""
+            self._valid_wow_path = False
             return False
-        if self._settings.wow_path != "":
-                self._watcher.removePath(self._get_addon_path())
-        self._settings.wow_path = os.path.abspath(path)
-        self._watcher.addPath(self._get_addon_path())
-        logging.getLogger().info("WoW path is set to '{}'".format(self._settings.wow_path))
         self._valid_wow_path = True
+        # store the new path
+        prev_wow_path = self._settings.wow_path
+        self._settings.wow_path = os.path.abspath(path)
+        logging.getLogger().info("WoW path is set to '{}'".format(self._settings.wow_path))
+        # update the directory watcher
+        if prev_wow_path != "":
+            self._watcher.removePath(self._get_addon_path())
+        self._watcher.addPath(self._get_addon_path())
+        # update the accounting info
+        self._accounting_data = {}
+        wtf_accounts_path = os.path.abspath(os.path.join(self._settings.wow_path, "WTF", "Account"))
+        for account_name in os.listdir(wtf_accounts_path):
+            sv_path = os.path.abspath(os.path.join(wtf_accounts_path, account_name, "SavedVariables", "TradeSkillMaster_Accounting.lua"))
+            if os.path.isfile(sv_path):
+                self._accounting_data[account_name] = AccountingData(sv_path)
         return True
 
 
@@ -147,3 +189,11 @@ class WoWHelper(QObject):
 
     def get_app_data(self):
         return AppData(os.path.join(self._get_addon_path("TradeSkillMaster_AppHelper"), "AppData.lua"))
+
+
+    def get_accounting_accounts(self):
+        return list(self._accounting_data.keys())
+
+
+    def get_accounting_data_object(self, account):
+        return self._accounting_data[account]
