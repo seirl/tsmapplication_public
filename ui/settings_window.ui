@@ -161,6 +161,64 @@
         </item>
        </layout>
       </widget>
+      <widget class="QWidget" name="notifications_tab">
+       <attribute name="title">
+        <string>Notifications</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_5">
+        <item>
+         <widget class="QLabel" name="label_6">
+          <property name="text">
+           <string>Check the boxes below to enable desktop notifications (aka toasts) for various events.</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="Line" name="line_7">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="realm_data_notification_checkbox">
+          <property name="text">
+           <string>New Realm Data Downloaded</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="addon_notification_checkbox">
+          <property name="text">
+           <string>Addon Update</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="backup_notification_checkbox">
+          <property name="text">
+           <string>New Backup Created</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="verticalSpacer_4">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>187</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
       <widget class="QWidget" name="backup_settings_tab">
        <attribute name="title">
         <string>Backup</string>

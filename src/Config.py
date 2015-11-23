@@ -48,6 +48,9 @@ DEFAULT_SETTINGS = {
     'confirm_exit': True,
     'backup_period': 30 * 60,
     'backup_expire': 30 * 24 * 60 * 60,
+    'realm_data_notification': True,
+    'addon_notification': True,
+    'backup_notification': True,
 }
 DEFAULT_OLD_LOGIN_SETTINGS = {
     'userId': 0,

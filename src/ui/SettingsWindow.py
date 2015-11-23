@@ -60,6 +60,9 @@ class SettingsWindow(QMainWindow):
             'minimize_to_tray': self._ui.minimize_to_tray_checkbox,
             'confirm_exit': self._ui.confirm_exit_checkbox,
             'tsm3_beta': self._ui.tsm3_beta_checkbox,
+            'realm_data_notification': self._ui.realm_data_notification_checkbox,
+            'addon_notification': self._ui.addon_notification_checkbox,
+            'backup_notification': self._ui.backup_notification_checkbox,
         }
         for setting_key, widget in self._settings_widgets.items():
             if isinstance(widget, QCheckBox):
@@ -102,17 +105,15 @@ class SettingsWindow(QMainWindow):
 
         # stylesheet tweaks for things which don't work when put into the .css for some unknown reason
         self._ui.general_tab.setStyleSheet("QCheckBox:disabled { color : #666; } QCheckBox { color : white; }");
+        self._ui.notifications_tab.setStyleSheet("QCheckBox:disabled { color : #666; } QCheckBox { color : white; }");
         self._ui.advanced_tab.setStyleSheet("QCheckBox:disabled { color : #666; } QCheckBox { color : white; }");
 
 
     def on_settings_changed(self):
         self._ignore_changes = True
+        for setting_key, widget in self._settings_widgets.items():
+            widget.setChecked(getattr(self._settings, setting_key))
         self._ui.wow_dir_editbox.setText(self._settings.wow_path)
-        self._ui.run_at_startup_checkbox.setChecked(self._settings.run_at_startup)
-        self._ui.start_minimized_checkbox.setChecked(self._settings.start_minimized)
-        self._ui.minimize_to_tray_checkbox.setChecked(self._settings.minimize_to_tray)
-        self._ui.confirm_exit_checkbox.setChecked(self._settings.confirm_exit)
-        self._ui.tsm3_beta_checkbox.setChecked(self._settings.tsm3_beta)
         self._ui.tsm3_beta_checkbox.setEnabled(self._settings.has_beta_access)
         self._ignore_changes = False
 

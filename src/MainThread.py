@@ -252,6 +252,8 @@ class MainThread(QThread):
         self.set_main_window_visible.emit(not is_logged_out)
         self.set_login_window_visible.emit(is_logged_out)
         if new_state == self.State.LOGGED_OUT:
+            if old_state != self.State.INIT:
+                self.show_desktop_notification.emit("You've been logged out.", True)
             self._api.logout()
         elif new_state == self.State.PENDING_NEW_SESSION:
             pass
@@ -340,13 +342,18 @@ class MainThread(QThread):
                 elif version_int < latest_version and (self._api.get_is_premium() or self._settings.tsm3_beta):
                     # update this addon
                     self._download_addon(addon['name'], "beta" if self._settings.tsm3_beta else "release")
+                    if self._settings.addon_notification:
+                        self.show_desktop_notification.emit("Downloaded {} {}".format(addon['name'], self._wow_helper.get_installed_version(addon['name'])), False)
                     installed_addons.append(addon['name'])
                 else:
                     installed_addons.append(addon['name'])
             else:
                 # this is a Dev version
                 installed_addons.append(addon['name'])
-        self._wow_helper.set_addons(installed_addons)
+        backed_up_accounts = self._wow_helper.set_addons_and_do_backups(installed_addons)
+        if self._settings.backup_notification:
+            for account in backed_up_accounts:
+                self.show_desktop_notification.emit("Created backup for {}".format(account), False)
         self._update_backup_status()
 
         # update addon status again incase we changed something (i.e. downloaded updates or deleted an old addon)
@@ -354,10 +361,20 @@ class MainThread(QThread):
 
         # check realm data (AuctionDB / Shopping / WoWuction) status
         app_data = self._wow_helper.get_app_data()
+        if not app_data:
+            # TSM_AppHelper is not installed
+            self.show_desktop_notification.emit("You need to install the TradeSkillMaster_AppHelper addon!", True)
+            self.set_main_window_header_text.emit("<font color='red'>You need to install <a href=\"http://www.curse.com/addons/wow/tradeskillmaster_apphelper\">TradeSkillMaster_AppHelper</a>!</font>")
+            return
         auctiondb_updates = []
         shopping_updates = []
         wowuction_updates = []
         self._data_sync_status = {}
+        if len(result['realms']) == 0:
+            # No realms setup so no point in going further
+            self.show_desktop_notification.emit("You have no realms setup!", True)
+            self.set_main_window_header_text.emit("<font color='red'>You have no <a href=\"https://tradeskillmaster.com/realms\">realms setup</a>!</font>")
+            return
         for info in result['realms']:
             self._data_sync_status[info['name']] = {
                 'id': info['id'],
@@ -382,6 +399,8 @@ class MainThread(QThread):
                     for realm_id in auctiondb_data['realms']:
                         realm_name, last_modified = next((x['name'], x['lastModified']) for x in result['realms'] if x['id'] == realm_id)
                         app_data.update("AUCTIONDB_MARKET_DATA", realm_name, auctiondb_data['data'], last_modified)
+                        if self._settings.realm_data_notification:
+                            self.show_desktop_notification.emit("Updated AuctionDB data for {}".format(realm_name), False)
             except (ApiError, ApiTransientError) as e:
                 # log an error and keep going
                 self._logger.error("Got error from AuctionDB API: {}".format(str(e)))
@@ -393,6 +412,8 @@ class MainThread(QThread):
                     for realm_id in shopping_data['realms']:
                         realm_name, last_modified = next((x['name'], x['lastModified']) for x in result['realms'] if x['id'] == realm_id)
                         app_data.update("SHOPPING_SEARCHES", realm_name, shopping_data['data'], last_modified, True)
+                        if self._settings.realm_data_notification:
+                            self.show_desktop_notification.emit("Updated Great Deals for {}".format(realm_name), False)
             except (ApiError, ApiTransientError) as e:
                 # log an error and keep going
                 self._logger.error("Got error from Shopping API: {}".format(str(e)))
@@ -415,6 +436,8 @@ class MainThread(QThread):
                     data = "{{{}}}".format(",".join(["{{{}}}".format(",".join([str(x) for x in item])) for item in data]))
                     processed_data = "{{downloadTime={},fields={{{}}},data={}}}".format(last_modified, ",".join(fields), data)
                     app_data.update("WOWUCTION_MARKET_DATA", realm_name, processed_data, last_modified)
+                    if self._settings.realm_data_notification:
+                        self.show_desktop_notification.emit("Updated WoWuction data for {}".format(realm_name), False)
             except (ApiError, ApiTransientError) as e:
                 # log an error and keep going
                 self._logger.error("Got error from WoWuction API: {}".format(str(e)))
@@ -459,6 +482,9 @@ class MainThread(QThread):
 
     def _update_data_sync_status(self):
         app_data = self._wow_helper.get_app_data()
+        if not app_data:
+            self.set_main_window_sync_status_data.emit([])
+            return
         # check data sync status versions
         sync_status = []
         for realm_name, info in self._data_sync_status.items():

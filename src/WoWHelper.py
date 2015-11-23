@@ -209,7 +209,10 @@ class WoWHelper(QObject):
 
 
     def get_app_data(self):
-        return AppData(os.path.join(self._get_addon_path("TradeSkillMaster_AppHelper"), "AppData.lua"))
+        path = os.path.join(self._get_addon_path("TradeSkillMaster_AppHelper"), "AppData.lua")
+        if not os.path.isfile(path):
+            return None
+        return AppData(path)
 
 
     def get_accounting_accounts(self):
@@ -224,9 +227,9 @@ class WoWHelper(QObject):
         return self._accounting_data[account]
 
 
-    def set_addons(self, addons):
+    def set_addons_and_do_backups(self, addons):
         self._addons = addons
-        self._do_backup()
+        return self._do_backup()
 
 
     def _saved_variables_iterator(self, account):
@@ -254,6 +257,7 @@ class WoWHelper(QObject):
     def _do_backup(self, account=None):
         accounts = [account] if account else self._get_accounts()
         backup_path = self._get_backup_path()
+        backed_up = []
         for account_name in accounts:
             # delete expired backups first so we'll do a new backup if the most recent one expired
             backup_times = []
@@ -285,7 +289,9 @@ class WoWHelper(QObject):
             with ZipFile(os.path.join(backup_path, zip_name), 'w', ZIP_LZMA) as zip:
                 for sv_path in self._saved_variables_iterator(account_name):
                     zip.write(sv_path, os.path.basename(sv_path))
+            backed_up.append(account_name)
             logging.getLogger().info("Created backup for account ({})".format(account_name))
+        return backed_up
 
 
     def get_backups(self):
@@ -293,6 +299,7 @@ class WoWHelper(QObject):
 
 
     def restore_backup(self, account, timestamp):
+        self._do_backup(account)
         backup_path = self._get_backup_path()
         zip_path = os.path.abspath(os.path.join(backup_path, "{}_{}.zip".format(account, timestamp)))
         if not os.path.isfile(zip_path):
