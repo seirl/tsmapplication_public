@@ -24,6 +24,7 @@ from gzip import GzipFile
 from io import BytesIO, StringIO
 import json
 import logging
+import socket
 from time import time
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -46,8 +47,8 @@ class ApiError(Exception):
 
 
 class ApiTransientError(Exception):
-    # raised when we get an unexpected response from the TSM server (and should generally just try again later)
-    def __init__(self, message="Failed to connect to the TSM server"):
+    # raised when we get an unexpected response from the server (and should generally just try again later)
+    def __init__(self, message="Failed to connect to the server"):
         Exception.__init__(self, message)
 
 
@@ -55,6 +56,7 @@ class AppAPI:
     def __init__(self):
         self._last_login = 0
         self._user_info = _DEFAULT_USER_INFO.copy()
+        socket.setdefaulttimeout(30)
 
 
     def _make_request(self, *args, **kwargs):
@@ -114,12 +116,14 @@ class AppAPI:
                         raise ApiError(data['error'])
                     # this request was successful
                     return data
-        except URLError as e:
+        except (URLError, socket.timeout) as e:
             # the request failed (weren't able to connect to the server)
             if isinstance(e, HTTPError):
                 logger.error("Got HTTP status code of {} ({})".format(e.code, e.reason))
-            else:
+            elif isinstance(e, URLError):
                 logger.error("Error while making HTTP request ({})".format(e.reason))
+            else:
+                logger.error("Error while making HTTP request ({})".format(str(e)))
         raise ApiTransientError()
 
 

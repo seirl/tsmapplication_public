@@ -14,6 +14,15 @@
 # along with the TSM Desktop Application.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import sys
+
+
+# Constant context parameters
+IS_WINDOWS = sys.platform.startswith("win32")
+IS_MAC = sys.platform.startswith("darwin")
+assert(IS_WINDOWS != IS_MAC) # only one should be set
+
+
 # General app constants
 ORG_NAME = "TradeSkillMaster"
 APP_NAME = "TSMApplication"
@@ -21,6 +30,8 @@ CURRENT_VERSION = 300
 LOG_FILE_NAME = "TSMApplication.log"
 STATUS_CHECK_INTERVAL_S = 10 * 60
 APP_API_BASE_URL = "http://app-server.tradeskillmaster.com/v1"
+BACKUP_TIME_FORMAT = "%Y%m%d%H%M%S"
+BACKUP_NAME_SEPARATOR = "_"
 
 # Default settings
 DEFAULT_SETTINGS = {
@@ -35,6 +46,8 @@ DEFAULT_SETTINGS = {
     'start_minimized': False,
     'minimize_to_tray': True,
     'confirm_exit': True,
+    'backup_period': 30 * 60,
+    'backup_expire': 30 * 24 * 60 * 60,
 }
 DEFAULT_OLD_LOGIN_SETTINGS = {
     'userId': 0,

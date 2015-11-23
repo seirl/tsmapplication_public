@@ -20,11 +20,13 @@ from Settings import load_settings
 from settings_window_ui import Ui_SettingsWindow
 
 # PyQt5
-from PyQt5.QtCore import pyqtSignal, QFile, QIODevice, Qt, QTimer, QUrl, QCoreApplication
+from PyQt5.QtCore import pyqtSignal, QCoreApplication, QFile, QIODevice, Qt, QTimer, QUrl
 from PyQt5.QtGui import QDesktopServices, QIcon
 from PyQt5.QtWidgets import QCheckBox, QFileDialog, QMainWindow, QMessageBox
 
 # General python modules
+from datetime import timedelta
+import logging
 import os
 
 
@@ -64,6 +66,34 @@ class SettingsWindow(QMainWindow):
                 widget.stateChanged.connect(self.checkbox_changed)
                 widget.setProperty("setting_key", setting_key)
 
+        # populate dropdowns
+        def get_seconds(**kwargs):
+            return int(timedelta(**kwargs).total_seconds())
+
+        # populate backup period dropdown
+        self._backup_period_text = ["30 minutes", "1 hour", "3 hours", "12 hours", "1 day", "3 days"]
+        self._backup_period_value = [get_seconds(minutes=30), get_seconds(hours=1), get_seconds(hours=3), get_seconds(hours=12), get_seconds(days=1), get_seconds(days=3)]
+        assert(len(self._backup_period_text) == len(self._backup_period_value))
+        for item in self._backup_period_text:
+            self._ui.backup_period_dropdown.addItem(item)
+        if self._settings.backup_period not in self._backup_period_value:
+            logging.getLogger().warning("Resetting backup expiration to default")
+            self._settings.backup_period = Config.DEFAULT_SETTINGS['backup_period']
+        self._ui.backup_period_dropdown.setCurrentIndex(self._backup_period_value.index(self._settings.backup_period))
+        self._ui.backup_period_dropdown.activated['int'].connect(self.backup_period_dropdown_changed)
+
+        # populate backup expiration dropdown
+        self._backup_expire_text = ["3 days", "1 week", "1 month", "1 year"]
+        self._backup_expire_value = [get_seconds(days=3), get_seconds(days=7), get_seconds(days=30), get_seconds(days=365)]
+        assert(len(self._backup_expire_text) == len(self._backup_expire_value))
+        for item in self._backup_expire_text:
+            self._ui.backup_expiration_dropdown.addItem(item)
+        if self._settings.backup_expire not in self._backup_expire_value:
+            logging.getLogger().warning("Resetting backup expiration to default")
+            self._settings.backup_expire = Config.DEFAULT_SETTINGS['backup_expire']
+        self._ui.backup_expiration_dropdown.setCurrentIndex(self._backup_expire_value.index(self._settings.backup_expire))
+        self._ui.backup_expiration_dropdown.activated['int'].connect(self.backup_expire_dropdown_changed)
+
         # Apply the stylesheet
         file = QFile(":/resources/settings_window.css")
         file.open(QIODevice.ReadOnly)
@@ -92,6 +122,14 @@ class SettingsWindow(QMainWindow):
             return
         setting_key = self.sender().property("setting_key")
         setattr(self._settings, setting_key, checked == Qt.Checked)
+
+
+    def backup_period_dropdown_changed(self, index):
+        self._settings.backup_period = self._backup_period_value[index]
+
+
+    def backup_expire_dropdown_changed(self, index):
+        self._settings.backup_expire = self._backup_expire_value[index]
 
 
     def wow_dir_button_clicked(self):

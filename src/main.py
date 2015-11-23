@@ -75,13 +75,15 @@ class TSMApp(QObject):
         self._main_thread.set_login_window_error_text.connect(self._login_window.set_error_text)
         # connect main window signals / slots
         self._main_window.settings_button_clicked.connect(self._settings_window.show)
-        self._main_window.addon_status_table_clicked.connect(self._main_thread.addon_status_table_clicked, Qt.QueuedConnection)
-        self._main_window.accounting_account_selected.connect(self._main_thread.accounting_account_selected)
+        self._main_window.status_table_clicked.connect(self._main_thread.status_table_clicked, Qt.QueuedConnection)
+        self._main_window.export_accounting.connect(self._main_thread.accounting_export)
         self._main_thread.set_main_window_visible.connect(self._main_window.setVisible)
         self._main_thread.set_main_window_header_text.connect(self._main_window._ui.header_text.setText)
         self._main_thread.set_main_window_sync_status_data.connect(self._main_window.set_sync_status_data)
         self._main_thread.set_main_window_addon_status_data.connect(self._main_window.set_addon_status_data)
+        self._main_thread.set_main_window_backup_status_data.connect(self._main_window.set_backup_status_data)
         self._main_thread.set_main_window_accounting_accounts.connect(self._main_window.set_accounting_accounts)
+        self._main_thread.show_desktop_notification.connect(self._main_window.show_notification)
         # connect settings window signals / slots
         self._settings_window.settings_changed.connect(self._main_thread.on_settings_changed)
         self._settings_window.upload_log_file.connect(self._main_thread.upload_log_file)

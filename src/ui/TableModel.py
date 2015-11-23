@@ -65,17 +65,13 @@ class TableModel(QAbstractTableModel):
                 cell_info['text'] = " {} ".format(cell_info['text'])
                 if 'color' not in cell_info:
                     cell_info['color'] = [255, 255, 255]
-                if 'click_enabled' not in cell_info:
-                    cell_info['click_enabled'] = False
-                elif cell_info['click_enabled']:
-                    assert(cell_info['click_key'])
         self._info = info
         self.endResetModel()
         return True
 
 
     def get_click_key(self, index):
-        if not index.isValid() or not self._info[index.row()][index.column()]['click_enabled']:
+        if not index.isValid() or 'click_key' not in self._info[index.row()][index.column()]:
             return None
         return self._info[index.row()][index.column()]['click_key']
 
@@ -83,7 +79,7 @@ class TableModel(QAbstractTableModel):
     def sort(self, col, order):
         self.beginResetModel()
         self.layoutAboutToBeChanged.emit()
-        self._info = sorted(self._info, key=lambda info: info[col]['text'])        
+        self._info = sorted(self._info, key=lambda info: info[col]['sort'] if 'sort' in info[col] else info[col]['text'])        
         if order == Qt.DescendingOrder:
             self._info.reverse()
         self.endResetModel()

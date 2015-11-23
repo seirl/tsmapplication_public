@@ -17,23 +17,43 @@
 # PyQt5
 from PyQt5.QtCore import QStandardPaths
 
+# General python modules
+import logging
+import os
+
+
+_DB_KEYS = {
+    'sales': "csvSales",
+    'purchases': "csvBuys",
+    'income': "csvIncome",
+    'expenses': "csvExpense",
+    'expired': "csvExpired",
+    'canceled': "csvCancelled"
+}
+
 
 class AccountingData:
-    SALES_DATA = 0
-    PURCHASES_DATA = 1
-    INCOME_DATA = 2
-    EXPENSES_DATA = 3
-    EXPIRED_DATA = 4
-    CANCELED_DATA = 5
-
-
     def __init__(self, path):
         self._path = path
 
 
-    def _lua_file_get(self, path, *target_scope):
+    def _lua_parse_value(self, value):
+        value = value.rstrip(",")
+        if value.startswith("\"") and value.endswith("\""):
+            # remove the quotes
+            return value[1:-1]
+        elif value == "true":
+            return True
+        elif value == "false":
+            return False
+        elif value.isdigit():
+            return int(value)
+
+
+    def _lua_file_get(self, target_scope):
         current_scope = []
-        with open(path, encoding="utf8") as f:
+        data = []
+        with open(self._path, encoding="utf8") as f:
             for line in f:
                 if "--" in line:
                     # remove the comment
@@ -44,22 +64,32 @@ class AccountingData:
                     # entering a new level of scope
                     if line.startswith("["):
                         # they key is within brackets and quotes
+                        assert(line.count("]") == 1)
                         current_scope.append(line[line.find("[")+2:line.rfind("]")-1])
                     else:
                         # this key is not within brackets or quotes
                         current_scope.append(line[:line.find("=")].strip())
                 elif line.endswith("},") or line.endswith("}"):
                     # go up a level of scope
-                    print(current_scope)
+                    if current_scope == target_scope:
+                        # we're leaving the scope we care about so we're done
+                        return data
                     current_scope.pop()
-                else:
-                    # this is data within the current scope
-                    pass
+                elif current_scope == target_scope:
+                    # this is data within the target scope
+                    if not line.startswith("["):
+                        data.append(self._lua_parse_value(line))
+                elif line.startswith("["):
+                    # we might just be looking for a single value
+                    current_scope.append(line[line.find("[")+2:line.find("]")-1])
+                    if current_scope == target_scope:
+                        return self._lua_parse_value(line[line.find("=")+1:].strip())
+                    current_scope.pop()
 
 
     def get_realms(self):
         realms = []
-        # self._lua_file_get(self._path)
+        self._lua_file_get(["TradeSkillMaster_AccountingDB", "_scopeKeys", "realm"])
         with open(self._path, encoding="utf8") as f:
             in_scope = 0
             for line in f:
@@ -76,8 +106,12 @@ class AccountingData:
         return realms
 
 
-    def export(self, *args):
-        valid_types = [attr for attr in dir(self) if not callable(attr) and not attr.startswith("__")]
-        for data_type in args:
-            assert(data in valid_types)
-        print("HERE2", QStandardPaths.writableLocation(QStandardPaths.DesktopLocation))
+    def export(self, realm, data_type):
+        path = os.path.join(QStandardPaths.writableLocation(QStandardPaths.DesktopLocation), "Accounting_{}_{}.csv".format(realm, data_type))
+        data = self._lua_file_get(["TradeSkillMaster_AccountingDB", "r@{}@{}".format(realm, _DB_KEYS[data_type])])
+        if type(data) != str:
+            return
+        data = data.replace("\\n", "\n")
+        with open(path, 'w', encoding="utf8") as f:
+            f.write(data)
+        logging.getLogger().info("Exported accounting data to {}".format(path))

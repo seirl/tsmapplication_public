@@ -23,15 +23,18 @@ from WoWHelper import WoWHelper
 
 # PyQt5
 from PyQt5.QtCore import pyqtSignal, QDateTime, QMutex, QSettings, QThread, QVariant, QWaitCondition, Qt
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QMessageBox
 
 # General python modules
 from enum import Enum
 from hashlib import sha512
 from io import BytesIO
 import logging
+import psutil
 import re
 import sys
-from time import time, sleep
+from time import strftime
 from zipfile import ZipFile
 
 
@@ -75,9 +78,11 @@ class MainThread(QThread):
     set_main_window_header_text = pyqtSignal(str)
     set_main_window_sync_status_data = pyqtSignal(list)
     set_main_window_addon_status_data = pyqtSignal(list)
-    set_main_window_accounting_accounts = pyqtSignal(list)
+    set_main_window_backup_status_data = pyqtSignal(list)
+    set_main_window_accounting_accounts = pyqtSignal(dict)
     settings_changed = pyqtSignal()
     log_uploaded = pyqtSignal(bool)
+    show_desktop_notification = pyqtSignal(str, bool)
 
 
     def __init__(self):
@@ -150,19 +155,42 @@ class MainThread(QThread):
         self._fire_wait_event(self.WaitEvent.LOGIN_BUTTON, (email, password))
 
 
-    def addon_status_table_clicked(self, click_key):
-        parts = click_key.split("~")
+    def status_table_clicked(self, click_key):
+        parts = click_key.split("_")
         table = parts.pop(0)
         if table == "addon":
             self._download_addon(*parts)
             self._update_addon_status()
+        elif table == "backup":
+            # check that WoW isn't running
+            for p in psutil.process_iter():
+                try:
+                    if p.cwd() == self._settings.wow_path:
+                        # WoW is running
+                        msg_box = QMessageBox()
+                        msg_box.setWindowIcon(QIcon(":/resources/logo.png"))
+                        msg_box.setWindowModality(Qt.ApplicationModal)
+                        msg_box.setIcon(QMessageBox.Warning)
+                        msg_box.setText("WoW cannot be open while restoring a backup. Please close WoW and try again.")
+                        msg_box.setStandardButtons(QMessageBox.Ok)
+                        msg_box.exec_()
+                        return
+                except psutil.AccessDenied:
+                    pass
+            success = self._wow_helper.restore_backup(*parts)
+            msg_box = QMessageBox()
+            msg_box.setWindowIcon(QIcon(":/resources/logo.png"))
+            msg_box.setWindowModality(Qt.ApplicationModal)
+            msg_box.setIcon(QMessageBox.Information if success else QMessageBox.Warning)
+            msg_box.setText("Restored backup successfully!" if success else "Failed to restore backup!")
+            msg_box.setStandardButtons(QMessageBox.Ok)
+            msg_box.exec_()
         else:
             raise Exception("Invalid table: {}".format(click_key))
 
 
-    def accounting_account_selected(self, account):
-        if account != "":
-            self._wow_helper.get_accounting_data_object(account).get_realms()
+    def accounting_export(self, account, realm, key):
+        self._wow_helper.export_accounting_csv(account, realm, key)
 
 
     def upload_log_file(self):
@@ -183,6 +211,7 @@ class MainThread(QThread):
 
     def reset_settings(self):
         self._settings.settings.clear()
+        self._settings.version = Config.CURRENT_VERSION
         self._wow_helper.set_wow_path("")
         self.stop_sleeping()
         self._set_fsm_state(self.State.LOGGED_OUT)
@@ -239,6 +268,7 @@ class MainThread(QThread):
                 # reset the main window
                 self.set_main_window_sync_status_data.emit([])
                 self.set_main_window_addon_status_data.emit([])
+                self.set_main_window_backup_status_data.emit([])
         elif new_state == self.State.SLEEPING:
             pass
         else:
@@ -299,6 +329,7 @@ class MainThread(QThread):
         self._update_addon_status()
 
         # download addon updates
+        installed_addons = []
         for addon in self._addon_versions:
             latest_version = addon['betaVersion'] if self._settings.tsm3_beta else addon['version']
             version_type, version_int, version_str = self._wow_helper.get_installed_version(addon['name'])
@@ -309,6 +340,14 @@ class MainThread(QThread):
                 elif version_int < latest_version and (self._api.get_is_premium() or self._settings.tsm3_beta):
                     # update this addon
                     self._download_addon(addon['name'], "beta" if self._settings.tsm3_beta else "release")
+                    installed_addons.append(addon['name'])
+                else:
+                    installed_addons.append(addon['name'])
+            else:
+                # this is a Dev version
+                installed_addons.append(addon['name'])
+        self._wow_helper.set_addons(installed_addons)
+        self._update_backup_status()
 
         # update addon status again incase we changed something (i.e. downloaded updates or deleted an old addon)
         self._update_addon_status()
@@ -395,7 +434,7 @@ class MainThread(QThread):
             version_type, version_int, version_str = self._wow_helper.get_installed_version(name)
             status = None
             if version_type == WoWHelper.INVALID_VERSION:
-                status = {'text': "Not installed (double-click to install)", 'click_enabled':True, 'click_key':"addon~{}~{}".format(name, "beta" if self._settings.tsm3_beta else "release")}
+                status = {'text': "Not installed (double-click to install)", 'click_key':"addon_{}_{}".format(name, "beta" if self._settings.tsm3_beta else "release")}
             elif version_type in [WoWHelper.RELEASE_VERSION, WoWHelper.BETA_VERSION]:
                 if latest_version == 0:
                     # this addon no longer exists, so it will be uninstalled
@@ -451,6 +490,16 @@ class MainThread(QThread):
         self.set_main_window_sync_status_data.emit(sync_status)
 
 
+    def _update_backup_status(self):
+        backup_status = []
+        for info in self._wow_helper.get_backups():
+            time_info = {'text': info['timestamp'].strftime("%c"), 'sort': int(info['timestamp'].timestamp())}
+            assert("_" not in info['account'])
+            notes_info = {'text': "Double-click to restore", 'click_key':"backup_{}_{}".format(info['account'], info['timestamp'].strftime(Config.BACKUP_TIME_FORMAT))}
+            backup_status.append([{'text': info['account']}, time_info, notes_info])
+        self.set_main_window_backup_status_data.emit(backup_status)
+
+
     def _run_fsm(self):
         sleep_time = 0
         if self._state == self.State.INIT:
@@ -466,6 +515,7 @@ class MainThread(QThread):
                 sleep_time = Config.STATUS_CHECK_INTERVAL_S
         elif self._state == self.State.VALID_SESSION:
             if not self._wow_helper.has_valid_wow_path():
+                self.show_desktop_notification.emit("You need to select your WoW directory in the settings!", True)
                 self.set_main_window_header_text.emit("<font color='red'>You need to select your WoW directory in the settings!</font>")
             else:
                 # make a status request and move on to SLEEPING (even if it fails)

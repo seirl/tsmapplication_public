@@ -21,14 +21,15 @@ import Config
 from Settings import load_settings
 
 # PyQt5
-from PyQt5.QtCore import pyqtSignal, QFileSystemWatcher, QObject, QTimer
+from PyQt5.QtCore import pyqtSignal, QFileSystemWatcher, QObject, QStandardPaths, QTimer, QUrl
+from PyQt5.QtGui import QDesktopServices
 
 # General python modules
+from datetime import datetime, timedelta
 import logging
 import os
 from shutil import rmtree
-import sys
-from time import time
+from zipfile import ZipFile, ZIP_LZMA
 
 
 class WoWHelper(QObject):
@@ -44,12 +45,12 @@ class WoWHelper(QObject):
     def __init__(self):
         QObject.__init__(self)
         self._watcher = QFileSystemWatcher()
-        self._watcher.fileChanged.connect(self.directory_changed)
         self._watcher.directoryChanged.connect(self.directory_changed)
         # initialize instances variables
         self._accounting_data = []
         self._addons_folder_change_scheduled = False
         self._valid_wow_path = False
+        self._addons = []
         self._settings = load_settings(Config.DEFAULT_SETTINGS)
 
         # load the WoW path
@@ -60,10 +61,32 @@ class WoWHelper(QObject):
 
 
     def _get_addon_path(self, addon=None):
-        if not addon:
-            return os.path.abspath(os.path.join(self._settings.wow_path, "Interface", "Addons"))
-        else:
+        if addon:
             return os.path.abspath(os.path.join(self._settings.wow_path, "Interface", "Addons", addon))
+        else:
+            return os.path.abspath(os.path.join(self._settings.wow_path, "Interface", "Addons"))
+
+
+    def _get_saved_variables_path(self, account, addon=None):
+        if addon:
+            return os.path.join(self._settings.wow_path, "WTF", "Account", account, "SavedVariables", "{}.lua".format(addon))
+        else:
+            return os.path.join(self._settings.wow_path, "WTF", "Account", account, "SavedVariables")
+
+
+    def _get_backup_path(self):
+        backup_path = os.path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), "Backups")
+        if not os.path.exists(backup_path):
+            os.makedirs(backup_path)
+        return backup_path
+
+
+    def _get_accounts(self):
+        accounts = []
+        for account_name in os.listdir(os.path.join(self._settings.wow_path, "WTF", "Account")):
+            if os.path.isfile(self._get_saved_variables_path(account_name, "TradeSkillMaster")):
+                accounts.append(account_name)
+        return accounts
 
 
     def _addons_folder_changed_delayed(self):
@@ -72,7 +95,7 @@ class WoWHelper(QObject):
 
 
     def find_wow_path(self):
-        if sys.platform.startswith("win32"):
+        if Config.IS_WINDOWS:
             import string
             from ctypes import windll
 
@@ -85,11 +108,10 @@ class WoWHelper(QObject):
                             search_paths.append(os.path.join(drive, sub_path, "World of Warcraft"))
                 except Exception as e:
                     logging.getLogger().error("Could not lookup drive type for '{}' ({})".format(drive, str(e)))
-        elif sys.platform.startswith("darwin"):
+        elif Config.IS_MAC:
             search_paths = [os.path.join("~/Applications", "World of Warcraft")]
         else:
-            logging.getLogger().error("Unsupported platform ({})".format(sys.platform))
-            return
+            raise Exception("Unexpected platform")
         for path in search_paths:
             if self.set_wow_path(path):
                 return
@@ -121,9 +143,8 @@ class WoWHelper(QObject):
         self._watcher.addPath(self._get_addon_path())
         # update the accounting info
         self._accounting_data = {}
-        wtf_accounts_path = os.path.abspath(os.path.join(self._settings.wow_path, "WTF", "Account"))
-        for account_name in os.listdir(wtf_accounts_path):
-            sv_path = os.path.abspath(os.path.join(wtf_accounts_path, account_name, "SavedVariables", "TradeSkillMaster_Accounting.lua"))
+        for account_name in self._get_accounts():
+            sv_path = self._get_saved_variables_path(account_name, "TradeSkillMaster_Accounting")
             if os.path.isfile(sv_path):
                 self._accounting_data[account_name] = AccountingData(sv_path)
         return True
@@ -192,8 +213,92 @@ class WoWHelper(QObject):
 
 
     def get_accounting_accounts(self):
-        return list(self._accounting_data.keys())
+        return {key:self._accounting_data[key].get_realms() for key in self._accounting_data}
+
+
+    def export_accounting_csv(self, account, realm, key):
+        self._accounting_data[account].export(realm, key)
 
 
     def get_accounting_data_object(self, account):
         return self._accounting_data[account]
+
+
+    def set_addons(self, addons):
+        self._addons = addons
+        self._do_backup()
+
+
+    def _saved_variables_iterator(self, account):
+        for addon in self._addons:
+            sv_path = self._get_saved_variables_path(account, addon)
+            if os.path.isfile(sv_path):
+                yield sv_path
+
+
+    def _backup_file_iterator(self, target_account=None):
+        for file_path in os.listdir(self._get_backup_path()):
+            file_name = os.path.basename(file_path)
+            if file_name.endswith(".zip") and file_name.count(Config.BACKUP_NAME_SEPARATOR) == 1:
+                # this is probably a backup .zip
+                account, timestamp = file_name[:-4].split(Config.BACKUP_NAME_SEPARATOR)
+                if target_account and account != target_account:
+                    continue
+                try:
+                    timestamp = datetime.strptime(timestamp, Config.BACKUP_TIME_FORMAT)
+                except ValueError:
+                    continue
+                yield account, timestamp, file_path
+
+
+    def _do_backup(self, account=None):
+        accounts = [account] if account else self._get_accounts()
+        backup_path = self._get_backup_path()
+        for account_name in accounts:
+            # delete expired backups first so we'll do a new backup if the most recent one expired
+            backup_times = []
+            for _, timestamp, path in self._backup_file_iterator(account_name):
+                if (datetime.now() - timestamp) > timedelta(seconds=self._settings.backup_expire):
+                    logging.getLogger().info("Purged old backup for account ({}): {}".format(account_name, path))
+                    os.remove(path)
+                else:
+                    backup_times.append(timestamp)
+
+            # check if the files have changed since the last backup - if not, don't take a new backup
+            modified_times = [int(os.path.getmtime(sv_path)) for sv_path in self._saved_variables_iterator(account_name)]
+            if not modified_times:
+                logging.getLogger().info("No files to back-up for account ({})".format(account_name))
+                continue
+            elif backup_times:
+                last_backup = max(backup_times)
+                if datetime.fromtimestamp(max(modified_times)) < last_backup:
+                    logging.getLogger().info("No update since last backup for account ({})".format(account_name))
+                    continue
+                elif (datetime.now() - last_backup) < timedelta(seconds=self._settings.backup_period):
+                    logging.getLogger().info("Backup period hasn't yet passed for account ({})".format(account_name))
+                    continue
+
+            # do the backup
+            assert(Config.BACKUP_NAME_SEPARATOR not in Config.BACKUP_TIME_FORMAT)
+            assert(Config.BACKUP_NAME_SEPARATOR not in account_name)
+            zip_name = "{}_{}.zip".format(account_name, datetime.now().strftime(Config.BACKUP_TIME_FORMAT))
+            with ZipFile(os.path.join(backup_path, zip_name), 'w', ZIP_LZMA) as zip:
+                for sv_path in self._saved_variables_iterator(account_name):
+                    zip.write(sv_path, os.path.basename(sv_path))
+            logging.getLogger().info("Created backup for account ({})".format(account_name))
+
+
+    def get_backups(self):
+        return [{'account': account, 'timestamp':timestamp} for account, timestamp, _ in self._backup_file_iterator()]
+
+
+    def restore_backup(self, account, timestamp):
+        backup_path = self._get_backup_path()
+        zip_path = os.path.abspath(os.path.join(backup_path, "{}_{}.zip".format(account, timestamp)))
+        if not os.path.isfile(zip_path):
+            logging.getLogger().error("Could not find backup: {}".format(zip_path))
+            return False
+        with ZipFile(zip_path) as zip:
+            zip.extractall(self._get_saved_variables_path(account))
+        logging.getLogger().info("Restored backup ({}, {})".format(account, timestamp))
+        return True
