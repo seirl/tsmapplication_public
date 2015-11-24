@@ -21,8 +21,7 @@ import Config
 from Settings import load_settings
 
 # PyQt5
-from PyQt5.QtCore import pyqtSignal, QFileSystemWatcher, QObject, QStandardPaths, QTimer, QUrl
-from PyQt5.QtGui import QDesktopServices
+from PyQt5.QtCore import pyqtSignal, QFileSystemWatcher, QObject, QStandardPaths, QTimer
 
 # General python modules
 from datetime import datetime, timedelta

@@ -21,8 +21,8 @@ from Settings import load_settings
 from ui.TableModel import TableModel
 
 # PyQt5
-from PyQt5.QtCore import pyqtSignal, QEvent, QFile, QIODevice, Qt, QTimer
-from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import pyqtSignal, QEvent, QFile, QIODevice, Qt, QTimer, QUrl
+from PyQt5.QtGui import QDesktopServices, QIcon
 from PyQt5.QtWidgets import QAction, QApplication, QMainWindow, QMenu, QMessageBox, QSystemTrayIcon
 
 # General python modules
@@ -53,6 +53,12 @@ class MainWindow(QMainWindow):
         self._ui.accounts_dropdown.activated['QString'].connect(self.accounts_dropdown_changed)
         self._ui.realm_dropdown.activated['QString'].connect(self.realm_dropdown_changed)
         self._ui.export_button.clicked.connect(self.export_button_clicked)
+        self._ui.premium_button.setProperty("url", "http://tradeskillmaster.com/premium")
+        self._ui.premium_button.clicked.connect(self._link_button_clicked)
+        self._ui.logo_button.setProperty("url", "http://tradeskillmaster.com")
+        self._ui.logo_button.clicked.connect(self._link_button_clicked)
+        self._ui.twitter_button.setProperty("url", "http://twitter.com/TSMAddon")
+        self._ui.twitter_button.clicked.connect(self._link_button_clicked)
 
         # Apply the stylesheet
         file = QFile(":/resources/main_window.css")
@@ -62,7 +68,7 @@ class MainWindow(QMainWindow):
 
         # set properties which are necessary for tweaking the style
         self._ui.premium_button.setProperty("id", "premiumButton")
-        self._ui.header.setProperty("id", "headerText")
+        self._ui.header_text.setProperty("id", "headerText")
 
         # stylesheet tweaks for things which don't work when put into the .css for some unknown reason
         self._ui.accounting_tab.setStyleSheet("QCheckBox:disabled { color : #666; } QCheckBox { color : white; }");
@@ -83,10 +89,10 @@ class MainWindow(QMainWindow):
         # create the system tray icon / menu
         self._tray_icon = QSystemTrayIcon(QIcon(":/resources/logo.png"), self)
         self._tray_icon.setToolTip("TradeSkillMaster Application r{}".format(Config.CURRENT_VERSION))
-        self._tray_icon.activated.connect(self.icon_activated)
+        self._tray_icon.activated.connect(self._icon_activated)
         tray_icon_menu = QMenu(self)
         restore_action = QAction("Restore", tray_icon_menu)
-        restore_action.triggered.connect(self.restore_from_tray)
+        restore_action.triggered.connect(self._restore_from_tray)
         tray_icon_menu.addAction(restore_action)
         tray_icon_menu.addSeparator()
         quit_action = QAction("Quit", tray_icon_menu)
@@ -109,16 +115,20 @@ class MainWindow(QMainWindow):
                 event.ignore()
 
 
-    def restore_from_tray(self):
+    def _restore_from_tray(self):
         logging.getLogger().info("Restoring from the system tray")
         self.show()
         self.setWindowState(Qt.WindowActive)
         self._tray_icon.hide()
 
 
-    def icon_activated(self, reason):
+    def _icon_activated(self, reason):
         if reason == QSystemTrayIcon.Trigger or reason == QSystemTrayIcon.DoubleClick:
-            self.restore_from_tray()
+            self._restore_from_tray()
+
+
+    def _link_button_clicked(self):
+        QDesktopServices.openUrl(QUrl(self.sender().property("url")))
 
 
     def _addon_status_table_clicked(self, index):

@@ -84,6 +84,7 @@ class TSMApp(QObject):
         self._main_thread.set_main_window_backup_status_data.connect(self._main_window.set_backup_status_data)
         self._main_thread.set_main_window_accounting_accounts.connect(self._main_window.set_accounting_accounts)
         self._main_thread.show_desktop_notification.connect(self._main_window.show_notification)
+        self._main_thread.set_main_window_title.connect(self._main_window.setWindowTitle)
         # connect settings window signals / slots
         self._settings_window.settings_changed.connect(self._main_thread.on_settings_changed)
         self._settings_window.upload_log_file.connect(self._main_thread.upload_log_file)

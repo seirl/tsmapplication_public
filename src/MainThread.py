@@ -80,6 +80,7 @@ class MainThread(QThread):
     set_main_window_addon_status_data = pyqtSignal(list)
     set_main_window_backup_status_data = pyqtSignal(list)
     set_main_window_accounting_accounts = pyqtSignal(dict)
+    set_main_window_title = pyqtSignal(str)
     settings_changed = pyqtSignal()
     log_uploaded = pyqtSignal(bool)
     show_desktop_notification = pyqtSignal(str, bool)
@@ -124,6 +125,7 @@ class MainThread(QThread):
         self._sleep_time = 0
         self._addon_versions = []
         self._data_sync_status = {}
+        self._last_news = ""
 
 
     def _wait_for_event(self, event):
@@ -326,6 +328,16 @@ class MainThread(QThread):
             self._logger.error("Got error from status API: {}".format(str(e)))
             return
 
+        self.set_main_window_title.emit("TradeSkillMaster Application r{} - {}".format(Config.CURRENT_VERSION, self._api.get_username()))
+        app_info = result['appInfo']
+        if app_info['version'] > Config.CURRENT_VERSION:
+            # TODO: update the app
+            return
+        elif app_info['news'] != self._last_news:
+            # show news
+            self.show_desktop_notification.emit(app_info['news'], False)
+            self._last_news = app_info['news']
+
         # update addon status
         self._addon_versions = result['addons']
         self._update_addon_status()
@@ -395,12 +407,14 @@ class MainThread(QThread):
         if auctiondb_updates:
             # get auctiondb updates (all at once)
             try:
+                updated_realms = []
                 for auctiondb_data in self._api.auctiondb(auctiondb_updates)['data']:
                     for realm_id in auctiondb_data['realms']:
                         realm_name, last_modified = next((x['name'], x['lastModified']) for x in result['realms'] if x['id'] == realm_id)
                         app_data.update("AUCTIONDB_MARKET_DATA", realm_name, auctiondb_data['data'], last_modified)
-                        if self._settings.realm_data_notification:
-                            self.show_desktop_notification.emit("Updated AuctionDB data for {}".format(realm_name), False)
+                        updated_realms.append(realm_name)
+                if self._settings.realm_data_notification:
+                    self.show_desktop_notification.emit("Updated AuctionDB data for {}".format(" / ".join(updated_realms)), False)
             except (ApiError, ApiTransientError) as e:
                 # log an error and keep going
                 self._logger.error("Got error from AuctionDB API: {}".format(str(e)))
@@ -408,12 +422,14 @@ class MainThread(QThread):
         if shopping_updates:
             # get shopping updates (all at once)
             try:
+                updated_realms = []
                 for shopping_data in self._api.shopping(shopping_updates)['data']:
                     for realm_id in shopping_data['realms']:
                         realm_name, last_modified = next((x['name'], x['lastModified']) for x in result['realms'] if x['id'] == realm_id)
                         app_data.update("SHOPPING_SEARCHES", realm_name, shopping_data['data'], last_modified, True)
-                        if self._settings.realm_data_notification:
-                            self.show_desktop_notification.emit("Updated Great Deals for {}".format(realm_name), False)
+                        updated_realms.append(realm_name)
+                if self._settings.realm_data_notification and updated_realms:
+                    self.show_desktop_notification.emit("Updated Great Deals for {}".format(" / ".join(updated_realms)), False)
             except (ApiError, ApiTransientError) as e:
                 # log an error and keep going
                 self._logger.error("Got error from Shopping API: {}".format(str(e)))
@@ -421,6 +437,7 @@ class MainThread(QThread):
         if wowuction_updates:
             # get wowuction updates
             try:
+                updated_realms = []
                 for realm_id in wowuction_updates:
                     realm_name, realm_slug = next((x['name'], x['slug']) for x in result['realms'] if x['id'] == realm_id)
                     last_modified = result['wowuction']['lastModified']
@@ -436,8 +453,9 @@ class MainThread(QThread):
                     data = "{{{}}}".format(",".join(["{{{}}}".format(",".join([str(x) for x in item])) for item in data]))
                     processed_data = "{{downloadTime={},fields={{{}}},data={}}}".format(last_modified, ",".join(fields), data)
                     app_data.update("WOWUCTION_MARKET_DATA", realm_name, processed_data, last_modified)
-                    if self._settings.realm_data_notification:
-                        self.show_desktop_notification.emit("Updated WoWuction data for {}".format(realm_name), False)
+                    updated_realms.append(realm_name)
+                if self._settings.realm_data_notification:
+                    self.show_desktop_notification.emit("Updated WoWuction data for {}".format(" / ".join(updated_realms)), False)
             except (ApiError, ApiTransientError) as e:
                 # log an error and keep going
                 self._logger.error("Got error from WoWuction API: {}".format(str(e)))
@@ -445,7 +463,7 @@ class MainThread(QThread):
         app_data.save()
         self._update_data_sync_status()
         if not hit_error:
-            self.set_main_window_header_text.emit("Welcome, {}!\nEverything is up to date as of {}.".format(self._api.get_username(), QDateTime.currentDateTime().toString(Qt.SystemLocaleShortDate)))
+            self.set_main_window_header_text.emit("{}\nEverything is up to date as of {}.".format(app_info['news'], QDateTime.currentDateTime().toString(Qt.SystemLocaleShortDate)))
 
 
     def _update_addon_status(self):

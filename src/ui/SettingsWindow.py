@@ -20,7 +20,7 @@ from Settings import load_settings
 from settings_window_ui import Ui_SettingsWindow
 
 # PyQt5
-from PyQt5.QtCore import pyqtSignal, QCoreApplication, QFile, QIODevice, Qt, QTimer, QUrl
+from PyQt5.QtCore import pyqtSignal, QCoreApplication, QFile, QIODevice, QStandardPaths, Qt, QTimer, QUrl
 from PyQt5.QtGui import QDesktopServices, QIcon
 from PyQt5.QtWidgets import QCheckBox, QFileDialog, QMainWindow, QMessageBox
 
@@ -50,6 +50,9 @@ class SettingsWindow(QMainWindow):
         self.setWindowTitle("Settings - r{}".format(Config.CURRENT_VERSION))
 
         # connect signals / slots
+        self._ui.realm_setup_button.setProperty("url", "http://tradeskillmaster.com/realms")
+        self._ui.realm_setup_button.clicked.connect(self._link_button_clicked)
+        self._ui.open_backups_button.clicked.connect(self._open_backups)
         self._ui.upload_log_button.clicked.connect(self.upload_log_button_clicked)
         self._ui.done_button.clicked.connect(self.hide)
         self._ui.wow_dir_browse_button.clicked.connect(self.wow_dir_button_clicked)
@@ -165,6 +168,14 @@ class SettingsWindow(QMainWindow):
     def reset_button_clicked(self):
         self.hide()
         self.reset_settings.emit()
+
+
+    def _link_button_clicked(self):
+        QDesktopServices.openUrl(QUrl(self.sender().property("url")))
+
+
+    def _open_backups(self):
+        QDesktopServices.openUrl(QUrl("file:///{}".format(os.path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), "Backups"))))
 
 
     def log_uploaded(self, success):
