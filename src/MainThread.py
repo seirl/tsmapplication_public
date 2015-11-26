@@ -293,7 +293,7 @@ class MainThread(QThread):
                 self._settings.password = ""
                 self._set_fsm_state(self.State.LOGGED_OUT)
             else:
-                # try again in 5 minutes
+                # try again in 1 minute
                 self.sleep(60)
             return str(e)
 

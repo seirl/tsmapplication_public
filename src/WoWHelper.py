@@ -16,8 +16,8 @@
 
 # Local modules
 from AppData import AppData
-from AccountingData import AccountingData
 import Config
+from SavedVariablesParser import parse_saved_variables
 from Settings import load_settings
 
 # PyQt5
@@ -145,7 +145,8 @@ class WoWHelper(QObject):
         for account_name in self._get_accounts():
             sv_path = self._get_saved_variables_path(account_name, "TradeSkillMaster_Accounting")
             if os.path.isfile(sv_path):
-                self._accounting_data[account_name] = AccountingData(sv_path)
+                with open(sv_path, encoding="utf8") as f:
+                    self._accounting_data[account_name] = parse_saved_variables(f.read())
         return True
 
 
@@ -215,15 +216,37 @@ class WoWHelper(QObject):
 
 
     def get_accounting_accounts(self):
-        return {key:self._accounting_data[key].get_realms() for key in self._accounting_data}
+        result = {}
+        for key in self._accounting_data:
+            try:
+                result[key] = [x for x in self._accounting_data[key]['TradeSkillMaster_AccountingDB']['_scopeKeys']['realm'].values()]
+            except KeyError:
+                pass
+        return result
 
 
     def export_accounting_csv(self, account, realm, key):
-        self._accounting_data[account].export(realm, key)
-
-
-    def get_accounting_data_object(self, account):
-        return self._accounting_data[account]
+        DB_KEYS = {
+            'sales': "csvSales",
+            'purchases': "csvBuys",
+            'income': "csvIncome",
+            'expenses': "csvExpense",
+            'expired': "csvExpired",
+            'canceled': "csvCancelled"
+        }
+        path = os.path.join(QStandardPaths.writableLocation(QStandardPaths.DesktopLocation), "Accounting_{}_{}.csv".format(realm, key))
+        try:
+            data = self._accounting_data[account]['TradeSkillMaster_AccountingDB']["r@{}@{}".format(realm, DB_KEYS[key])]
+        except KeyError as e:
+            logging.getLogger().error("Failed to export accounting data ({}, {}, {}): {}".format(account, realm, key, str(e)))
+            return
+        if type(data) != str:
+            logging.getLogger().error("Failed to export accounting data ({}, {}, {})".format(account, realm, key))
+            return
+        data = data.replace("\\n", "\n")
+        with open(path, 'w', encoding="utf8") as f:
+            f.write(data)
+        logging.getLogger().info("Exported accounting data to {}".format(path))
 
 
     def set_addons_and_do_backups(self, addons):
