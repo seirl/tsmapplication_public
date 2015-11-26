@@ -19,6 +19,7 @@ import Config
 import PrivateConfig
 
 # General python modules
+from base64 import b64encode
 from hashlib import md5, sha1, sha256, sha512
 from gzip import GzipFile
 from io import BytesIO, StringIO
@@ -67,12 +68,18 @@ class AppAPI:
             'Accept-Encoding': 'gzip',
         }
         if data:
+            if type(data) == str:
+                headers['Content-Type'] = "text/plain"
+            elif type(data) in [list, dict]:
+                data = json.dumps(data)
+                headers['Content-Type'] = "application/json"
+            else:
+                raise Exception("Invalid data type ({})!".format(type(data)))
             # gzip the data
             buffer = BytesIO()
             with GzipFile(fileobj=buffer, mode="wb") as f:
                 f.write(bytes(data, 'UTF-8'))
             data = buffer.getvalue()
-            headers['Content-Type'] = "text/plain"
             headers['Content-Encoding'] = "gzip"
         current_time = int(time())
         if alt_url:
@@ -184,4 +191,12 @@ class AppAPI:
 
 
     def log(self, data):
-        return self._make_request("log", data=data)
+        self._make_request("log", data=data)
+
+
+    # def upload_times(self, account):
+        # return self._make_request("upload_times", b64encode(account.encode("utf8")).decode("ascii"))
+
+
+    def black_market(self, data):
+        self._make_request("black_market", data=data)

@@ -199,14 +199,14 @@ class MainThread(QThread):
         with open(Config.LOG_FILE_NAME) as log_file:
             data = log_file.read()
         try:
-            # self._api.log(log_file.read())
+            self._api.log(log_file.read())
             self.log_uploaded.emit(True)
         except (ApiTransientError, ApiError) as e:
             self.log_uploaded.emit(False)
 
 
     def on_settings_changed(self, str):
-        if not self._wow_helper.has_valid_wow_path() and self._wow_helper.set_wow_path(str) and self._state == self.State.SLEEPING:
+        if not self._wow_helper.has_valid_wow_path() and self._wow_helper.set_wow_path(str):
             # we just got a valid wow directory so stop sleeping
             self.stop_sleeping()
 
@@ -544,8 +544,16 @@ class MainThread(QThread):
         self.set_main_window_backup_status_data.emit(backup_status)
 
 
+    def _upload_data(self):
+        try:
+            self._api.black_market(self._wow_helper.get_black_market_data())
+            self._logger.info("Upload black market data!")
+        except (ApiError, ApiTransientError) as e:
+            self._logger.error("Got error from black market API: {}".format(str(e)))
+
+
     def _run_fsm(self):
-        sleep_time = 0
+        self._sleep_time = 0
         if self._state == self.State.INIT:
             # just go to the next state - this is so we can show the login window when we enter LOGGED_OUT
             self._set_fsm_state(self.State.LOGGED_OUT)
@@ -556,24 +564,25 @@ class MainThread(QThread):
             # get a new session by making a login request (which will move us to VALID_SESSION)
             if self._login_request():
                 # we failed to login, wait before trying again
-                sleep_time = Config.STATUS_CHECK_INTERVAL_S
+                self._sleep_time = Config.STATUS_CHECK_INTERVAL_S
         elif self._state == self.State.VALID_SESSION:
+            self._sleep_time = Config.STATUS_CHECK_INTERVAL_S
             if not self._wow_helper.has_valid_wow_path():
                 self.show_desktop_notification.emit("You need to select your WoW directory in the settings!", True)
                 self.set_main_window_header_text.emit("<font color='red'>You need to select your WoW directory in the settings!</font>")
             else:
-                # make a status request and move on to SLEEPING (even if it fails)
+                # make a status request
                 self._check_status()
                 # update the accounting tab
                 self.set_main_window_accounting_accounts.emit(self._wow_helper.get_accounting_accounts())
+                # upload app data
+                self._upload_data()
             self._set_fsm_state(self.State.SLEEPING)
-            sleep_time = Config.STATUS_CHECK_INTERVAL_S
         elif self._state == self.State.SLEEPING:
             # go back to PENDING_NEW_SESSION
             self._set_fsm_state(self.State.PENDING_NEW_SESSION)
         else:
             raise Exception("Invalid state {}".format(self._state))
-        self._sleep_time = sleep_time
         while self._sleep_time > 0:
             self._sleep_time -= 1
             self.sleep(1)

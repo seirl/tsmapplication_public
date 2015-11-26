@@ -80,7 +80,7 @@ class WoWHelper(QObject):
         return backup_path
 
 
-    def _get_accounts(self):
+    def get_accounts(self):
         accounts = []
         for account_name in os.listdir(os.path.join(self._settings.wow_path, "WTF", "Account")):
             if os.path.isfile(self._get_saved_variables_path(account_name, "TradeSkillMaster")):
@@ -142,7 +142,7 @@ class WoWHelper(QObject):
         self._watcher.addPath(self._get_addon_path())
         # update the accounting info
         self._accounting_data = {}
-        for account_name in self._get_accounts():
+        for account_name in self.get_accounts():
             sv_path = self._get_saved_variables_path(account_name, "TradeSkillMaster_Accounting")
             if os.path.isfile(sv_path):
                 with open(sv_path, encoding="utf8") as f:
@@ -277,7 +277,7 @@ class WoWHelper(QObject):
 
 
     def _do_backup(self, account=None):
-        accounts = [account] if account else self._get_accounts()
+        accounts = [account] if account else self.get_accounts()
         backup_path = self._get_backup_path()
         backed_up = []
         for account_name in accounts:
@@ -331,3 +331,28 @@ class WoWHelper(QObject):
             zip.extractall(self._get_saved_variables_path(account))
         logging.getLogger().info("Restored backup ({}, {})".format(account, timestamp))
         return True
+
+
+    def get_black_market_data(self):
+        update_times = {}
+        result = []
+        for account in self.get_accounts():
+            sv_path = self._get_saved_variables_path(account, "TradeSkillMaster_AppHelper")
+            if os.path.isfile(sv_path):
+                with open(sv_path, encoding="utf8") as f:
+                    try:
+                        sv_data = parse_saved_variables(f.read())
+                        account_data = sv_data["TradeSkillMaster_AppHelperDB"]["blackMarket"]
+                        region = sv_data["TradeSkillMaster_AppHelperDB"]["region"]
+                        if not account_data or not region:
+                            continue
+                    except KeyError as e:
+                        logging.getLogger().warn("No black market data for {}".format(account))
+                        continue
+                    for realm in account_data:
+                        if realm not in update_times or account_data[realm]['updateTime'] > update_times[("US", realm)]['updateTime']:
+                            update_times[(region, realm)] = account_data[realm]['updateTime']
+                            account_data[realm]['region'] = region
+                            account_data[realm]['realm'] = realm
+                            result.append(account_data[realm])
+        return result
