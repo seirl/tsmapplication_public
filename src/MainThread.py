@@ -545,11 +545,14 @@ class MainThread(QThread):
 
 
     def _upload_data(self):
-        try:
-            self._api.black_market(self._wow_helper.get_black_market_data())
-            self._logger.info("Upload black market data!")
-        except (ApiError, ApiTransientError) as e:
-            self._logger.error("Got error from black market API: {}".format(str(e)))
+        # upload black market data
+        for key, data in self._wow_helper.get_black_market_data().items():
+            region, realm = key
+            try:
+                self._api.black_market(region, realm, data, data['updateTime'])
+                self._logger.info("Uploaded black market data ({}, {})!".format(region, realm))
+            except (ApiError, ApiTransientError) as e:
+                self._logger.error("Got error from black market API: {}".format(str(e)))
 
 
     def _run_fsm(self):

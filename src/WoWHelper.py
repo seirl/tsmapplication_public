@@ -28,6 +28,7 @@ from datetime import datetime, timedelta
 import logging
 import os
 from shutil import rmtree
+from time import time
 from zipfile import ZipFile, ZIP_LZMA
 
 
@@ -334,8 +335,7 @@ class WoWHelper(QObject):
 
 
     def get_black_market_data(self):
-        update_times = {}
-        result = []
+        realm_data = {}
         for account in self.get_accounts():
             sv_path = self._get_saved_variables_path(account, "TradeSkillMaster_AppHelper")
             if os.path.isfile(sv_path):
@@ -349,10 +349,11 @@ class WoWHelper(QObject):
                     except KeyError as e:
                         logging.getLogger().warn("No black market data for {}".format(account))
                         continue
-                    for realm in account_data:
-                        if realm not in update_times or account_data[realm]['updateTime'] > update_times[("US", realm)]['updateTime']:
-                            update_times[(region, realm)] = account_data[realm]['updateTime']
-                            account_data[realm]['region'] = region
-                            account_data[realm]['realm'] = realm
-                            result.append(account_data[realm])
-        return result
+                    for realm, data in account_data.items():
+                        if data['updateTime'] < (int(time()) - Config.MAX_BLACK_MARKET_AGE):
+                            # data is too old to bother uploading
+                            continue
+                        key = (region, realm)
+                        if key not in realm_data or realm_data[key]['updateTime'] < data['updateTime']:
+                            realm_data[key] = account_data[realm]
+        return realm_data

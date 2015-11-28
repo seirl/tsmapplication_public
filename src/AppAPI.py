@@ -198,5 +198,10 @@ class AppAPI:
         # return self._make_request("upload_times", b64encode(account.encode("utf8")).decode("ascii"))
 
 
-    def black_market(self, data):
-        self._make_request("black_market", data=data)
+    def black_market(self, region, realm, data, update_time):
+        realm = b64encode(realm.encode("utf8")).decode("ascii")
+        # first, get the last upload time
+        last_upload = self._make_request("black_market", region, realm)['lastUpload']
+        if update_time > last_upload:
+            # this data is newer than what's on the server, so upload it
+            self._make_request("black_market", region, realm, data=data)

@@ -32,6 +32,7 @@ STATUS_CHECK_INTERVAL_S = 10 * 60
 APP_API_BASE_URL = "http://app-server.tradeskillmaster.com/v1"
 BACKUP_TIME_FORMAT = "%Y%m%d%H%M%S"
 BACKUP_NAME_SEPARATOR = "_"
+MAX_BLACK_MARKET_AGE = 24 * 60 * 60
 
 # Default settings
 DEFAULT_SETTINGS = {
