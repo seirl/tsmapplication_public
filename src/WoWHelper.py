@@ -17,7 +17,7 @@
 # Local modules
 from AppData import AppData
 import Config
-from SavedVariablesParser import parse_saved_variables
+from SavedVariables import SavedVariables
 from Settings import load_settings
 
 # PyQt5
@@ -47,11 +47,11 @@ class WoWHelper(QObject):
         self._watcher = QFileSystemWatcher()
         self._watcher.directoryChanged.connect(self.directory_changed)
         # initialize instances variables
-        self._accounting_data = []
         self._addons_folder_change_scheduled = False
         self._valid_wow_path = False
         self._addons = []
         self._settings = load_settings(Config.DEFAULT_SETTINGS)
+        self._saved_variables = {}
 
         # load the WoW path
         self.set_wow_path("")
@@ -72,6 +72,12 @@ class WoWHelper(QObject):
             return os.path.join(self._settings.wow_path, "WTF", "Account", account, "SavedVariables", "{}.lua".format(addon))
         else:
             return os.path.join(self._settings.wow_path, "WTF", "Account", account, "SavedVariables")
+
+
+    def _get_saved_variables(self, account, addon):
+        if (account, addon) not in self._saved_variables:
+            self._saved_variables[(account, addon)] = SavedVariables(self._get_saved_variables_path(account, addon), addon)
+        return self._saved_variables[(account, addon)].get_data()
 
 
     def _get_backup_path(self):
@@ -141,13 +147,6 @@ class WoWHelper(QObject):
         if prev_wow_path != "":
             self._watcher.removePath(self._get_addon_path())
         self._watcher.addPath(self._get_addon_path())
-        # update the accounting info
-        self._accounting_data = {}
-        for account_name in self.get_accounts():
-            sv_path = self._get_saved_variables_path(account_name, "TradeSkillMaster_Accounting")
-            if os.path.isfile(sv_path):
-                with open(sv_path, encoding="utf8") as f:
-                    self._accounting_data[account_name] = parse_saved_variables(f.read())
         return True
 
 
@@ -218,11 +217,13 @@ class WoWHelper(QObject):
 
     def get_accounting_accounts(self):
         result = {}
-        for key in self._accounting_data:
-            try:
-                result[key] = [x for x in self._accounting_data[key]['TradeSkillMaster_AccountingDB']['_scopeKeys']['realm'].values()]
-            except KeyError:
-                pass
+        for account_name in self.get_accounts():
+            data = self._get_saved_variables(account_name, "TradeSkillMaster_Accounting")
+            if data:
+                try:
+                    result[account_name] = [x for x in data['_scopeKeys']['realm'].values()]
+                except KeyError:
+                    pass
         return result
 
 
@@ -237,7 +238,10 @@ class WoWHelper(QObject):
         }
         path = os.path.join(QStandardPaths.writableLocation(QStandardPaths.DesktopLocation), "Accounting_{}_{}.csv".format(realm, key))
         try:
-            data = self._accounting_data[account]['TradeSkillMaster_AccountingDB']["r@{}@{}".format(realm, DB_KEYS[key])]
+            data = self._get_saved_variables(account, "TradeSkillMaster_Accounting")
+            if not data:
+                return
+            data = data["r@{}@{}".format(realm, DB_KEYS[key])]
         except KeyError as e:
             logging.getLogger().error("Failed to export accounting data ({}, {}, {}): {}".format(account, realm, key, str(e)))
             return
@@ -335,25 +339,117 @@ class WoWHelper(QObject):
 
 
     def get_black_market_data(self):
-        realm_data = {}
+        result = {}
         for account in self.get_accounts():
-            sv_path = self._get_saved_variables_path(account, "TradeSkillMaster_AppHelper")
-            if os.path.isfile(sv_path):
-                with open(sv_path, encoding="utf8") as f:
-                    try:
-                        sv_data = parse_saved_variables(f.read())
-                        account_data = sv_data["TradeSkillMaster_AppHelperDB"]["blackMarket"]
-                        region = sv_data["TradeSkillMaster_AppHelperDB"]["region"]
-                        if not account_data or not region:
-                            continue
-                    except KeyError as e:
-                        logging.getLogger().warn("No black market data for {}".format(account))
-                        continue
-                    for realm, data in account_data.items():
-                        if data['updateTime'] < (int(time()) - Config.MAX_BLACK_MARKET_AGE):
-                            # data is too old to bother uploading
-                            continue
-                        key = (region, realm)
-                        if key not in realm_data or realm_data[key]['updateTime'] < data['updateTime']:
-                            realm_data[key] = account_data[realm]
-        return realm_data
+            data = self._get_saved_variables(account, "TradeSkillMaster_AppHelper")
+            if not data:
+                continue
+            try:
+                account_data = data["blackMarket"]
+                region = data["region"]
+                if not account_data or not region:
+                    continue
+            except KeyError as e:
+                logging.getLogger().warn("No black market data for {}".format(account))
+                continue
+            for realm, data in account_data.items():
+                if data['updateTime'] < (int(time()) - Config.MAX_BLACK_MARKET_AGE):
+                    # data is too old to bother uploading
+                    continue
+                key = (region, realm)
+                if key not in result or result[key]['updateTime'] < data['updateTime']:
+                    result[key] = data
+        return result
+
+
+    def _parse_csv(self, data):
+        import csv
+        result = []
+        rows = [x for x in csv.reader(data.split('\\n'), delimiter=',')]
+        if len(rows) <= 1:
+            return None
+        keys = rows.pop(0)
+        for row in rows:
+            if len(row) != len(keys):
+                # invalid row
+                return None
+            result_row = {}
+            for i, cell_value in enumerate(row):
+                result_row[keys[i]] = cell_value
+            result.append(result_row)
+        return result
+
+
+    def get_accounting_data(self):
+        result = {}
+        for account in self.get_accounts():
+            app_helper_data = self._get_saved_variables(account, "TradeSkillMaster_AppHelper")
+            if not app_helper_data:
+                continue
+            region = app_helper_data['region'] if 'region' in app_helper_data else None
+            if not region:
+                continue
+            data = self._get_saved_variables(account, "TradeSkillMaster_Accounting")
+            for realm in data['_scopeKeys']['realm'].values():
+                def parse_data_helper(key):
+                    if key not in data:
+                        return None
+                    parsed_data = self._parse_csv(data[key])
+                    if not parsed_data:
+                        return None
+                    return [x for x in parsed_data if 'source' in x and x['source'] == "Auction"]
+                sales = parse_data_helper("r@{}@csvSales".format(realm))
+                buys = parse_data_helper("r@{}@csvBuys".format(realm))
+                def parse_save_time_helper(key):
+                    if key not in data:
+                        return None
+                    return [int(x) for x in data[key].split(",") if x.isdigit()]
+                save_time_sales = parse_save_time_helper("r@{}@saveTimeSales".format(realm))
+                save_time_buys = parse_save_time_helper("r@{}@saveTimeBuys".format(realm))
+                account_data = {'data': {}, 'updateTime': 0}
+                def process_data_iterator(data, save_times):
+                    if not data or not save_times or len(data) != len(save_times):
+                        return
+                    for i, record in enumerate(data):
+                        item_string_parts = record['itemString'].split(":")
+                        if item_string_parts[0] == "i":
+                            yield int(item_string_parts[1]), int(record['price']), int(record['stackSize']), int(record['quantity']), int(record['time']), int(save_time_sales[i])
+                for item_id, price, stack_size, quantity, sale_time, save_time in process_data_iterator(sales, save_time_sales):
+                    if item_id not in account_data['data']:
+                        account_data['data'][item_id] = []
+                    account_data['data'][item_id].append([price, stack_size, quantity, sale_time, save_time, 2])
+                    account_data['updateTime'] = max(account_data['updateTime'], save_time)
+                for item_id, price, stack_size, quantity, sale_time, save_time in process_data_iterator(buys, save_time_buys):
+                    if item_id not in account_data['data']:
+                        account_data['data'][item_id] = []
+                    account_data['data'][item_id].append([price, stack_size, quantity, sale_time, save_time, 3])
+                    account_data['updateTime'] = max(account_data['updateTime'], save_time)
+                if account_data:
+                    result[(region, realm, account)] = account_data
+        return result
+
+
+    def get_group_data(self):
+        result = {}
+        for account in self.get_accounts():
+            account_data = {}
+            data = self._get_saved_variables(account, "TradeSkillMaster_AppHelper")
+            if not data:
+                continue
+            try:
+                account_data = data["shoppingMaxPrices"]
+                region = data["region"]
+                if not account_data or not region:
+                    continue
+            except KeyError as e:
+                logging.getLogger().warn("No shopping data for {}".format(account))
+                continue
+            for profile, data in account_data.items():
+                data = data.copy()
+                update_time = data.pop('updateTime', None)
+                if update_time:
+                    account_data[profile] = {'updateTime': update_time, 'data': data}
+            for profile, data in account_data.items():
+                data['profiles'] = list(account_data.keys())
+                result[(account, profile)] = data
+        return result

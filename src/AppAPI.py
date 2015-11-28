@@ -194,10 +194,6 @@ class AppAPI:
         self._make_request("log", data=data)
 
 
-    # def upload_times(self, account):
-        # return self._make_request("upload_times", b64encode(account.encode("utf8")).decode("ascii"))
-
-
     def black_market(self, region, realm, data, update_time):
         realm = b64encode(realm.encode("utf8")).decode("ascii")
         # first, get the last upload time
@@ -205,3 +201,28 @@ class AppAPI:
         if update_time > last_upload:
             # this data is newer than what's on the server, so upload it
             self._make_request("black_market", region, realm, data=data)
+            return True
+        return False
+
+
+    def sales(self, region, realm, account, data=None):
+        realm = b64encode(realm.encode("utf8")).decode("ascii")
+        account = b64encode(account.encode("utf8")).decode("ascii")
+        if data:
+            # upload the data
+            self._make_request("sales", region, realm, account, data=data)
+        else:
+            # get the last upload time
+            return self._make_request("sales", region, realm, account)['lastUpload']
+
+
+    def groups(self, account, profile, data, update_time):
+        account = b64encode(account.encode("utf8")).decode("ascii")
+        profile = b64encode(profile.encode("utf8")).decode("ascii")
+        # first, get the last upload time
+        last_upload = self._make_request("groups", account, profile)['lastUpload']
+        if update_time > last_upload:
+            # this data is newer than what's on the server, so upload it
+            self._make_request("groups", account, profile, data=data)
+            return True
+        return False

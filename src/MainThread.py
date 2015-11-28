@@ -549,10 +549,35 @@ class MainThread(QThread):
         for key, data in self._wow_helper.get_black_market_data().items():
             region, realm = key
             try:
-                self._api.black_market(region, realm, data, data['updateTime'])
-                self._logger.info("Uploaded black market data ({}, {})!".format(region, realm))
+                if self._api.black_market(region, realm, data, data['updateTime']):
+                    self._logger.info("Uploaded black market data ({}, {})!".format(region, realm))
             except (ApiError, ApiTransientError) as e:
                 self._logger.error("Got error from black market API: {}".format(str(e)))
+
+        # upload sales data
+        for key, data in self._wow_helper.get_accounting_data().items():
+            region, realm, account = key
+            try:
+                last_upload = self._api.sales(region, realm, account)
+                if last_upload < data['updateTime']:
+                    new_data = []
+                    for item_id, sales in data['data'].items():
+                        new_data.extend([[item_id] + x for x in sales if x[4] > last_upload])
+                    if new_data:
+                        # upload the new data
+                        self._api.sales(region, realm, account, new_data)
+                        self._logger.info("Uploaded sales data ({}, {}, {})!".format(region, realm, account))
+            except (ApiError, ApiTransientError) as e:
+                self._logger.error("Got error from sales API: {}".format(str(e)))
+
+        # upload group data
+        for key, data in self._wow_helper.get_group_data().items():
+            account, profile = key
+            try:
+                if self._api.groups(account, profile, data, data['updateTime']):
+                    self._logger.info("Uploaded group data ({}, {})!".format(account, profile))
+            except (ApiError, ApiTransientError) as e:
+                self._logger.error("Got error from group API: {}".format(str(e)))
 
 
     def _run_fsm(self):
