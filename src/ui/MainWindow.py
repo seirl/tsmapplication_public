@@ -86,27 +86,31 @@ class MainWindow(QMainWindow):
         self._accounting_current_account = ""
         self._accounting_current_realm = ""
 
-        # create the system tray icon / menu
-        self._tray_icon = QSystemTrayIcon(QIcon(":/resources/logo.png"), self)
-        self._tray_icon.setToolTip("TradeSkillMaster Application r{}".format(Config.CURRENT_VERSION))
-        self._tray_icon.activated.connect(self._icon_activated)
-        tray_icon_menu = QMenu(self)
-        restore_action = QAction("Restore", tray_icon_menu)
-        restore_action.triggered.connect(self._restore_from_tray)
-        tray_icon_menu.addAction(restore_action)
-        tray_icon_menu.addSeparator()
-        quit_action = QAction("Quit", tray_icon_menu)
-        quit_action.triggered.connect(self.close)
-        tray_icon_menu.addAction(quit_action)
-        self._tray_icon.setContextMenu(tray_icon_menu)
-        self._tray_icon.hide()
+        if Config.IS_WINDOWS:
+            # create the system tray icon / menu
+            self._tray_icon = QSystemTrayIcon(QIcon(":/resources/logo.png"), self)
+            self._tray_icon.setToolTip("TradeSkillMaster Application r{}".format(Config.CURRENT_VERSION))
+            self._tray_icon.activated.connect(self._icon_activated)
+            tray_icon_menu = QMenu(self)
+            restore_action = QAction("Restore", tray_icon_menu)
+            restore_action.triggered.connect(self._restore_from_tray)
+            tray_icon_menu.addAction(restore_action)
+            tray_icon_menu.addSeparator()
+            quit_action = QAction("Quit", tray_icon_menu)
+            quit_action.triggered.connect(self.close)
+            tray_icon_menu.addAction(quit_action)
+            self._tray_icon.setContextMenu(tray_icon_menu)
+            self._tray_icon.hide()
 
 
     def __del__(self):
-        self._tray_icon.hide()
+        if Config.IS_WINDOWS:
+            self._tray_icon.hide()
 
 
     def changeEvent(self, event):
+        if not Config.IS_WINDOWS:
+            return
         if event.type() == QEvent.WindowStateChange:
             if self.isMinimized() and self._settings.minimize_to_tray:
                 logging.getLogger().info("Minimizing to the system tray")
@@ -116,6 +120,8 @@ class MainWindow(QMainWindow):
 
 
     def _restore_from_tray(self):
+        if not Config.IS_WINDOWS:
+            return
         logging.getLogger().info("Restoring from the system tray")
         self.show()
         self.setWindowState(Qt.WindowActive)
@@ -123,6 +129,8 @@ class MainWindow(QMainWindow):
 
 
     def _icon_activated(self, reason):
+        if not Config.IS_WINDOWS:
+            return
         if reason == QSystemTrayIcon.Trigger or reason == QSystemTrayIcon.DoubleClick:
             self._restore_from_tray()
 
@@ -162,6 +170,8 @@ class MainWindow(QMainWindow):
 
 
     def show_notification(self, message, critical):
+        if not Config.IS_WINDOWS:
+            return
         icon = QSystemTrayIcon.Critical if critical else QSystemTrayIcon.NoIcon
         if self._tray_icon.isVisible():
             self._tray_icon.showMessage("TradeSkillMaster Desktop Application", message, icon)

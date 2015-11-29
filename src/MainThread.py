@@ -34,7 +34,7 @@ import logging
 import psutil
 import re
 import sys
-from time import strftime
+from time import strftime, time
 import traceback
 from zipfile import ZipFile
 
@@ -484,6 +484,7 @@ class MainThread(QThread):
                 # log an error and keep going
                 self._logger.error("Got error from WoWuction API: {}".format(str(e)))
                 hit_error = True
+        app_data.update("APP_INFO", "Global", "{{version={}}}".format(Config.CURRENT_VERSION), int(time()))
         app_data.save()
         self._update_data_sync_status()
         if not hit_error:

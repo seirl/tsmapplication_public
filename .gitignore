@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 build/
 dist/
+.DS_STORE
 
 TSMApplication.log*
 
