@@ -1,1 +1,4 @@
 psutil
+py2exe
+pyreadline
+pypiwin32

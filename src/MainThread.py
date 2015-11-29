@@ -35,6 +35,7 @@ import psutil
 import re
 import sys
 from time import strftime
+import traceback
 from zipfile import ZipFile
 
 
@@ -158,7 +159,7 @@ class MainThread(QThread):
 
 
     def status_table_clicked(self, click_key):
-        parts = click_key.split("_")
+        parts = click_key.split("~")
         table = parts.pop(0)
         if table == "addon":
             self._download_addon(*parts)
@@ -196,17 +197,20 @@ class MainThread(QThread):
 
 
     def upload_log_file(self):
-        with open(Config.LOG_FILE_NAME) as log_file:
+        data = None
+        with open(Config.LOG_FILE_PATH) as log_file:
             data = log_file.read()
+        if not data:
+            self.log_uploaded.emit(False)
         try:
-            self._api.log(log_file.read())
+            self._api.log(data)
             self.log_uploaded.emit(True)
         except (ApiTransientError, ApiError) as e:
             self.log_uploaded.emit(False)
 
 
     def on_settings_changed(self, str):
-        if not self._wow_helper.has_valid_wow_path() and self._wow_helper.set_wow_path(str):
+        if self._wow_helper.set_wow_path(str):
             # we just got a valid wow directory so stop sleeping
             self.stop_sleeping()
 
@@ -231,8 +235,6 @@ class MainThread(QThread):
         except (ApiTransientError, ApiError) as e:
             # either the user or we will try again later
             self._logger.error("Addon download error: {}".format(str(e)))
-            if isinstance(e, ApiError):
-                self._set_fsm_state(self.State.LOGGED_OUT)
 
 
     def _set_fsm_state(self, new_state):
@@ -257,6 +259,7 @@ class MainThread(QThread):
             if old_state != self.State.INIT:
                 self.show_desktop_notification.emit("You've been logged out.", True)
             self._api.logout()
+            self.stop_sleeping()
         elif new_state == self.State.PENDING_NEW_SESSION:
             pass
         elif new_state == self.State.VALID_SESSION:
@@ -344,10 +347,26 @@ class MainThread(QThread):
 
         # download addon updates
         installed_addons = []
+        install_all = False
+        download_notifications = []
         for addon in self._addon_versions:
             latest_version = addon['betaVersion'] if self._settings.tsm3_beta else addon['version']
             version_type, version_int, version_str = self._wow_helper.get_installed_version(addon['name'])
-            if version_type in [WoWHelper.RELEASE_VERSION, WoWHelper.BETA_VERSION]:
+            if self._settings.tsm3_beta and version_type == WoWHelper.RELEASE_VERSION:
+                # upgrade to beta
+                version_int = 0
+                version_str = ""
+                install_all = True
+            elif not self._settings.tsm3_beta and version_type == WoWHelper.BETA_VERSION:
+                # downgrade to release
+                version_int = 0
+                version_str = ""
+                install_all = True
+            elif version_type == WoWHelper.INVALID_VERSION and install_all:
+                # install all addons when upgrading / downgrading
+                version_int = 0
+                version_str = ""
+            if version_type in [WoWHelper.RELEASE_VERSION, WoWHelper.BETA_VERSION] or install_all:
                 if latest_version == 0:
                     # remove this addon since it no longer exists
                     self._wow_helper.delete_addon(addon['name'])
@@ -355,13 +374,18 @@ class MainThread(QThread):
                     # update this addon
                     self._download_addon(addon['name'], "beta" if self._settings.tsm3_beta else "release")
                     if self._settings.addon_notification:
-                        self.show_desktop_notification.emit("Downloaded {} {}".format(addon['name'], self._wow_helper.get_installed_version(addon['name'])), False)
+                        download_notifications.append("Downloaded {} {}".format(addon['name'], self._wow_helper.get_installed_version(addon['name'])[2]))
                     installed_addons.append(addon['name'])
                 else:
                     installed_addons.append(addon['name'])
             else:
                 # this is a Dev version
                 installed_addons.append(addon['name'])
+        if len(download_notifications) > 2:
+            self.show_desktop_notification.emit("Downloading addon updates!", False)
+        else:
+            for text in download_notifications:
+                self.show_desktop_notification.emit(text, False)
         backed_up_accounts = self._wow_helper.set_addons_and_do_backups(installed_addons)
         if self._settings.backup_notification:
             for account in backed_up_accounts:
@@ -475,7 +499,10 @@ class MainThread(QThread):
             version_type, version_int, version_str = self._wow_helper.get_installed_version(name)
             status = None
             if version_type == WoWHelper.INVALID_VERSION:
-                status = {'text': "Not installed (double-click to install)", 'click_key':"addon_{}_{}".format(name, "beta" if self._settings.tsm3_beta else "release")}
+                if latest_version == 0:
+                    # this addon doesn't exist
+                    continue
+                status = {'text': "Not installed (double-click to install)", 'click_key':"addon~{}~{}".format(name, "beta" if self._settings.tsm3_beta else "release")}
             elif version_type in [WoWHelper.RELEASE_VERSION, WoWHelper.BETA_VERSION]:
                 if latest_version == 0:
                     # this addon no longer exists, so it will be uninstalled
@@ -538,8 +565,8 @@ class MainThread(QThread):
         backup_status = []
         for info in self._wow_helper.get_backups():
             time_info = {'text': info['timestamp'].strftime("%c"), 'sort': int(info['timestamp'].timestamp())}
-            assert("_" not in info['account'])
-            notes_info = {'text': "Double-click to restore", 'click_key':"backup_{}_{}".format(info['account'], info['timestamp'].strftime(Config.BACKUP_TIME_FORMAT))}
+            assert("~" not in info['account'])
+            notes_info = {'text': "Double-click to restore", 'click_key':"backup~{}~{}".format(info['account'], info['timestamp'].strftime(Config.BACKUP_TIME_FORMAT))}
             backup_status.append([{'text': info['account']}, time_info, notes_info])
         self.set_main_window_backup_status_data.emit(backup_status)
 
@@ -617,5 +644,10 @@ class MainThread(QThread):
 
 
     def run(self):
-        while True:
-            self._run_fsm()
+        try:
+            while True:
+                self._run_fsm()
+        except:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+            logging.getLogger().error("".join(lines))

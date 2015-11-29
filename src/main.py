@@ -28,6 +28,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox
 
 # General python modules
+import argparse
 import logging
 from logging.handlers import RotatingFileHandler
 import os
@@ -39,7 +40,7 @@ class TSMApp(QObject):
     terms_accepted = pyqtSignal()
 
 
-    def __init__(self):
+    def __init__(self, args):
         QObject.__init__(self)
         # Create the QApplication
         self._app = QApplication(sys.argv)
@@ -49,8 +50,11 @@ class TSMApp(QObject):
         # initialize the logger
         logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s", datefmt="%m/%d/%Y %H:%M:%S")
         self._logger = logging.getLogger()
+        if not args.debug:
+            # remove default (stdout) handler
+            self._logger.handlers = []
         self._logger.setLevel(logging.DEBUG)
-        handler = RotatingFileHandler(Config.LOG_FILE_NAME, mode='w', maxBytes=200000, backupCount=1)
+        handler = RotatingFileHandler(Config.LOG_FILE_PATH, mode='w', maxBytes=200000, backupCount=1)
         handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s", "%m/%d/%Y %H:%M:%S"))
         handler.doRollover() # clear the log everytime we start
         self._logger.addHandler(handler)
@@ -121,7 +125,10 @@ class TSMApp(QObject):
 if __name__ == "__main__":
     # Catch and log any exceptions that occur while running the app
     try:
-        tsm_app = TSMApp()
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--debug", action="store_true", default=False)
+        args = parser.parse_args()
+        tsm_app = TSMApp(args)
         tsm_app.run()
     except:
         exc_type, exc_value, exc_traceback = sys.exc_info()

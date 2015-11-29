@@ -54,7 +54,6 @@ class WoWHelper(QObject):
         self._saved_variables = {}
 
         # load the WoW path
-        self.set_wow_path("")
         if not self.set_wow_path(self._settings.wow_path):
             # try to automatically determine the wow path
             self.find_wow_path()
@@ -89,6 +88,8 @@ class WoWHelper(QObject):
 
     def get_accounts(self):
         accounts = []
+        if not os.path.isdir(os.path.join(self._settings.wow_path, "WTF", "Account")):
+            return accounts
         for account_name in os.listdir(os.path.join(self._settings.wow_path, "WTF", "Account")):
             if os.path.isfile(self._get_saved_variables_path(account_name, "TradeSkillMaster")):
                 accounts.append(account_name)

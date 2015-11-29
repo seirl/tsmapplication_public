@@ -168,7 +168,10 @@ class SavedVariables:
 
 
     def get_data(self):
-        modified_time = int(os.path.getmtime(self._path))
-        if modified_time > self._timestamp:
-            self._update_data()
+        if not os.path.isfile(self._path):
+            self._data = None
+        else:
+            modified_time = int(os.path.getmtime(self._path))
+            if modified_time > self._timestamp:
+                self._update_data()
         return self._data

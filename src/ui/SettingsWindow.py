@@ -126,6 +126,8 @@ class SettingsWindow(QMainWindow):
             return
         setting_key = self.sender().property("setting_key")
         setattr(self._settings, setting_key, checked == Qt.Checked)
+        if setting_key == "tsm3_beta":
+            self.settings_changed.emit(self._settings.wow_path)
 
 
     def backup_period_dropdown_changed(self, index):
@@ -196,4 +198,4 @@ class SettingsWindow(QMainWindow):
         msg_box.exec_()
         if not success:
             # open up the file so they can manually upload it to a pastebin
-            QDesktopServices.openUrl(QUrl("file:///{}".format(os.path.join(os.getcwd(), Config.LOG_FILE_NAME))))
+            QDesktopServices.openUrl(QUrl("file:///{}".format(Config.LOG_FILE_PATH)))

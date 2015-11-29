@@ -23,6 +23,7 @@ import fnmatch
 import os
 import sys
 import shutil
+from zipfile import ZipFile, ZIP_LZMA
 
 
 # a list of all supported operations
@@ -39,8 +40,14 @@ UI_SRC_PATH = "ui"
 # folder to compile into
 BUILD_DIR = "build"
 
+# folder to build the exe / dlls into
+DIST_DIR = "build/dist"
+
 # name of the main script to run
 MAIN_SCRIPT = "main.py"
+
+# name of the .exe and .zip that are built
+APP_NAME = "TSMApplication"
 
 
 def find_files(dir, pattern):
@@ -84,13 +91,67 @@ class Operations:
 
     @staticmethod
     def run():
-        os.system("python {}".format(os.path.join(BUILD_DIR, MAIN_SCRIPT)))
+        os.system("python {} --debug".format(os.path.join(BUILD_DIR, MAIN_SCRIPT)))
 
     @staticmethod
     def package():
-        from py2exe.build_exe import py2exe
-        from distutils.core import setup
-        setup(windows=[{"script": os.path.join(BUILD_DIR, MAIN_SCRIPT)}])
+        from setuptools import setup
+        import py2exe
+        import site
+        sys.path.append("build/")
+
+        if sys.platform.startswith("win32"):
+            platform_file_path = os.path.join(next(x for x in site.getsitepackages() if "site-packages" in x), "PyQt5/plugins/platforms/qwindows.dll")
+        elif sys.platform.startswith("darwin"):
+            raise Exception("FIXME")
+        else:
+            raise Exception("Unsupported platform!")
+
+        # setuptools uses argv, so just fake it
+        sys.argv = ["make.py", "py2exe"]
+        setup(
+            windows = [
+                {
+                    "script": os.path.join(BUILD_DIR, MAIN_SCRIPT),
+                    "icon_resources": [(1, os.path.join(RESOURCE_SRC_PATH, "logo.ico"))],
+                    "dest_base" : APP_NAME
+                }
+            ],
+            data_files = [("platforms", [platform_file_path])],
+            options = {
+                'py2exe': {
+                    'includes': ["sip"],
+                    'dist_dir': DIST_DIR,
+                    'excludes': ["_ssl", 'pydoc', 'doctest', 'test'],
+                    'bundle_files': 2,
+                    'compressed': True,
+                }
+            },
+        )
+
+        # manually copy some dlls we've pre-built
+        dll_prebuilt = ["icudt53.dll"]
+        for dll in dll_prebuilt:
+            src_path = os.path.join(RESOURCE_SRC_PATH, dll)
+            dst_path = os.path.join(DIST_DIR, dll)
+            if os.path.isfile(src_path):
+                print("Copy DLL {} to {}".format(src_path, dst_path))
+                shutil.copy(src_path, dst_path)
+
+        # zip up the result
+        zip_path = os.path.join(BUILD_DIR, "{}.zip".format(APP_NAME))
+        print("Creating zip: {}".format(zip_path))
+        with ZipFile(zip_path, 'w', ZIP_LZMA) as zip:
+            for path in os.listdir(DIST_DIR):
+                abs_path = os.path.abspath(os.path.join(DIST_DIR, path))
+                if os.path.isdir(abs_path):
+                    for sub_path in os.listdir(abs_path):
+                        abs_sub_path = os.path.abspath(os.path.join(abs_path, sub_path))
+                        assert(os.path.isfile(abs_sub_path))
+                        zip.write(abs_sub_path, os.path.join(path, os.path.basename(sub_path)))
+                else:
+                    zip.write(abs_path, os.path.basename(path))
+        shutil.rmtree(DIST_DIR)
 
 
 if __name__ == "__main__":
