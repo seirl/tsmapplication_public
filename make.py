@@ -55,7 +55,7 @@ def find_files(dir, pattern):
         for file_name in fnmatch.filter(file_names, pattern):
             yield os.path.join(root_path, file_name)
 
-            
+
 class Operations:
     @staticmethod
     def __dir__():
@@ -133,6 +133,21 @@ class Operations:
                 if os.path.isfile(src_path):
                     print("Copy DLL {} to {}".format(src_path, dst_path))
                     shutil.copy(src_path, dst_path)
+
+            # zip up the result
+            zip_path = os.path.join(BUILD_DIR, "{}.zip".format(APP_NAME))
+            print("Creating zip: {}".format(zip_path))
+            with ZipFile(zip_path, 'w', ZIP_DEFLATED) as zip:
+                for path in os.listdir(DIST_DIR):
+                    abs_path = os.path.abspath(os.path.join(DIST_DIR, path))
+                    if os.path.isdir(abs_path):
+                        for sub_path in os.listdir(abs_path):
+                            abs_sub_path = os.path.abspath(os.path.join(abs_path, sub_path))
+                            assert(os.path.isfile(abs_sub_path))
+                            zip.write(abs_sub_path, os.path.join(path, os.path.basename(sub_path)))
+                    else:
+                        zip.write(abs_path, os.path.basename(path))
+            shutil.rmtree(DIST_DIR)
         elif sys.platform.startswith("darwin"):
             import py2app
             sys.argv.append("py2app")
@@ -142,31 +157,17 @@ class Operations:
                 options = {
                     'py2app': {
                         'argv_emulation': True,
-                        'includes': ["sip", "PyQt5"],
-                        # 'dist_dir': DIST_DIR,
-                        # 'excludes': ["_ssl", 'pydoc', 'doctest', 'test'],
-                        # 'compressed': True,
+                        'iconfile': "resources/logo.icns",
+                        'includes': ["sip"],
+                        'dist_dir': DIST_DIR,
+                        'excludes': ["_ssl", 'pydoc', 'doctest', 'test'],
+                        'compressed': True,
                     }
                 },
                 setup_requires = ['py2app'],
             )
         else:
             raise Exception("Unsupported platform!")
-
-        # zip up the result
-        zip_path = os.path.join(BUILD_DIR, "{}.zip".format(APP_NAME))
-        print("Creating zip: {}".format(zip_path))
-        with ZipFile(zip_path, 'w', ZIP_DEFLATED) as zip:
-            for path in os.listdir(DIST_DIR):
-                abs_path = os.path.abspath(os.path.join(DIST_DIR, path))
-                if os.path.isdir(abs_path):
-                    for sub_path in os.listdir(abs_path):
-                        abs_sub_path = os.path.abspath(os.path.join(abs_path, sub_path))
-                        assert(os.path.isfile(abs_sub_path))
-                        zip.write(abs_sub_path, os.path.join(path, os.path.basename(sub_path)))
-                else:
-                    zip.write(abs_path, os.path.basename(path))
-        shutil.rmtree(DIST_DIR)
 
 
 if __name__ == "__main__":
