@@ -153,7 +153,8 @@ class Operations:
             sys.argv.append("py2app")
 
             setup(
-                app = os.path.join(BUILD_DIR, MAIN_SCRIPT),
+                name = APP_NAME
+                app = [os.path.join(BUILD_DIR, MAIN_SCRIPT)],
                 options = {
                     'py2app': {
                         'argv_emulation': True,
