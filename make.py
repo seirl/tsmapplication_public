@@ -153,7 +153,7 @@ class Operations:
             sys.argv.append("py2app")
 
             setup(
-                name = APP_NAME
+                name = APP_NAME,
                 app = [os.path.join(BUILD_DIR, MAIN_SCRIPT)],
                 options = {
                     'py2app': {
