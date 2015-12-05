@@ -69,7 +69,11 @@ RESOURCE_CODE = """
 import os
 import sys
 
-_resource_data_path = os.path.join(os.path.dirname(sys.executable), "{}")
+rel_path = "{}"
+if getattr(sys, 'frozen', False):
+    _resource_data_path = os.path.join(os.path.dirname(sys.executable), rel_path)
+else:
+    _resource_data_path = os.path.join(os.path.dirname(sys.argv[0]), rel_path)
 with open(_resource_data_path, "rb") as f:
     def get_length():
         return (2 ** 24) * ord(f.read(1)) + (2 ** 16) * ord(f.read(1)) + (2 ** 8) * ord(f.read(1)) + ord(f.read(1))
@@ -96,7 +100,7 @@ qInitResources()
 INNO_SETUP_CODE = r"""
 #define MyAppName "TradeSkillMaster Application"
 #define MyExeName "TSMApplication"
- 
+
 [Setup]
 AppId={{c44da794-b956-4d50-8733-346d56ae63c7}
 AppName={#MyAppName}
@@ -110,7 +114,7 @@ Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=admin
 DisableProgramGroupPage=yes
- 
+
 [Dirs]
 Name: "{app}"; Permissions: Users-full
 Name: "{app}\app"; Permissions: Users-full
@@ -131,7 +135,7 @@ Name: "{commondesktop}\{#MyExeName}"; Filename: "{app}\app\{#MyExeName}.exe"
  var
      mres : integer;
  begin
-    case CurUninstallStep of                   
+    case CurUninstallStep of
       usPostUninstall:
         begin
           mres := MsgBox('Do you want to remove the settings?', mbConfirmation, MB_YESNO or MB_DEFBUTTON2)
@@ -342,29 +346,90 @@ class Operations:
     @staticmethod
     def dist_mac():
         assert(sys.platform.startswith("darwin"))
-        from setuptools import setup
-        sys.path.append("build/")
+        from cx_Freeze import setup, Executable
 
-        # setuptools uses argv, so we'll just fake it
-        sys.argv = ["make.py"]
-        import py2app
-        sys.argv.append("py2app")
+        # Dependencies are automatically detected, but it might need fine tuning.
+        build_exe_options = {
+            'build_exe': UPDATER_DIST_DIR,
+            'excludes': ["_ssl", "pydoc", "doctest", "test", "_hashlib", "_bz2", "_lzma", "zipfile", "gzip", "unicodedata", "logging"],
+            'compressed': True
+        }
 
+        sys.argv = ["make.py", "build"]
         setup(
-            name = APP_NAME,
-            app = [os.path.join(BUILD_DIR, MAIN_SCRIPT)],
-            options = {
-                'py2app': {
-                    'argv_emulation': True,
-                    'iconfile': "resources/logo.icns",
-                    'includes': ["sip"],
-                    'dist_dir': APP_DIST_DIR,
-                    'excludes': ["_ssl", 'pydoc', 'doctest', 'test'],
-                    'compressed': True,
-                }
-            },
-            setup_requires = ['py2app'],
+            name = UPDATER_NAME,
+            version = "1.0", # this version is meaningless for our purposes, but required
+            options = {'build_exe': build_exe_options},
+            executables = [
+                Executable(
+                    UDPATER_MAIN_SCRIPT_PATH,
+                    base = None,
+                    targetName = UPDATER_NAME,
+                    targetDir = UPDATER_DIST_DIR
+                )
+            ]
         )
+
+        # # Dependencies are automatically detected, but it might need fine tuning.
+        # build_exe_options = {
+            # 'build_exe': APP_DIST_DIR,
+            # 'excludes': ["_ssl", "pydoc", "doctest", "test"],
+            # 'compressed': True
+        # }
+
+        # sys.path.append("build/")
+        # sys.argv = ["make.py", "build"]
+        # setup(
+            # name = APP_NAME,
+            # version = "1.0", # this version is meaningless for our purposes, but required
+            # options = {'build_exe': build_exe_options},
+            # executables = [
+                # Executable(
+                    # os.path.join(BUILD_DIR, MAIN_SCRIPT),
+                    # base = "Win32GUI",
+                    # targetName = APP_NAME + ".exe",
+                    # targetDir = APP_DIST_DIR,
+                    # icon = os.path.join(RESOURCE_SRC_PATH, "logo.ico")
+                # )
+            # ]
+        # )
+
+        # # manually copy resource binary files
+        # resource_files = ["resources.data"]
+        # for resource_file in resource_files:
+            # src_path = os.path.join(BUILD_DIR, resource_file)
+            # dst_path = os.path.join(APP_DIST_DIR, resource_file)
+            # if os.path.isfile(src_path):
+                # print("Copy resource data file {} to {}".format(src_path, dst_path))
+                # shutil.copy(src_path, dst_path)
+
+
+    # @staticmethod
+    # def dist_mac():
+        # assert(sys.platform.startswith("darwin"))
+        # from setuptools import setup
+        # sys.path.append("build/")
+
+        # # setuptools uses argv, so we'll just fake it
+        # sys.argv = ["make.py"]
+        # import py2app
+        # sys.argv.append("py2app")
+
+        # setup(
+            # name = APP_NAME,
+            # app = [os.path.join(BUILD_DIR, MAIN_SCRIPT)],
+            # options = {
+                # 'py2app': {
+                    # 'argv_emulation': True,
+                    # 'iconfile': "resources/logo.icns",
+                    # 'includes': ["sip"],
+                    # 'dist_dir': APP_DIST_DIR,
+                    # 'excludes': ["_ssl", 'pydoc', 'doctest', 'test'],
+                    # 'compressed': True,
+                # }
+            # },
+            # setup_requires = ['py2app'],
+        # )
 
 
 if __name__ == "__main__":

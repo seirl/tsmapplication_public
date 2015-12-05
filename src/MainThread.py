@@ -110,7 +110,6 @@ class MainThread(QThread):
                 old_settings = QSettings(QSettings.IniFormat, QSettings.UserScope, Config.ORG_NAME, "TSMApplication")
                 self._settings.wow_path = old_settings.value("core/wowDirPath", Config.DEFAULT_SETTINGS['wow_path'])
                 self._settings.tsm3_beta = (WoWHelper().get_installed_version("TradeSkillMaster")[0] == WoWHelper.BETA_VERSION)
-                # TODO: clear the old settings
                 self._logger.info("Imported old settings!")
         self._settings.version = Config.CURRENT_VERSION
 
@@ -225,6 +224,7 @@ class MainThread(QThread):
         self._settings.version = Config.CURRENT_VERSION
         self._wow_helper.set_wow_path("")
         self.stop_sleeping()
+        # TODO: fix crash if we're in the middle of the VALID_SESSION state
         self._set_fsm_state(self.State.LOGGED_OUT)
 
 
@@ -343,7 +343,7 @@ class MainThread(QThread):
         self.set_main_window_title.emit("TradeSkillMaster Application r{} - {}".format(Config.CURRENT_VERSION, self._api.get_username()))
         app_info = result['appInfo']
         if app_info['version'] > Config.CURRENT_VERSION:
-            # TODO: update the app
+            # we should have already updated - abort and wait to try again
             return
         elif app_info['news'] != self._last_news:
             # show news
@@ -623,7 +623,7 @@ class MainThread(QThread):
 
 
     def _update_app(self):
-        # TODO: this probably won't work on mac
+        # TODO: this won't work on mac
         # don't try to update if we're not frozen
         if not getattr(sys, 'frozen', False):
             return
