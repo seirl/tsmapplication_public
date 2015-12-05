@@ -624,6 +624,8 @@ class MainThread(QThread):
 
     def _update_app(self):
         # TODO: this won't work on mac
+        if not Config.IS_WINDOWS:
+            return
         # don't try to update if we're not frozen
         if not getattr(sys, 'frozen', False):
             return

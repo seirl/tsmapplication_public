@@ -350,58 +350,56 @@ class Operations:
 
         # Dependencies are automatically detected, but it might need fine tuning.
         build_exe_options = {
-            'build_exe': UPDATER_DIST_DIR,
+            #'build_exe': UPDATER_DIST_DIR,
             'excludes': ["_ssl", "pydoc", "doctest", "test", "_hashlib", "_bz2", "_lzma", "zipfile", "gzip", "unicodedata", "logging"],
             'compressed': True
         }
 
-        sys.argv = ["make.py", "build"]
+        sys.argv = ["make.py", "build", "bdist_mac"]
         setup(
             name = UPDATER_NAME,
             version = "1.0", # this version is meaningless for our purposes, but required
-            options = {'build_exe': build_exe_options},
+            options = {'build_exe': build_exe_options, 'bdist_mac': {'bundle_name': UPDATER_NAME}},
             executables = [
                 Executable(
                     UDPATER_MAIN_SCRIPT_PATH,
-                    base = None,
-                    targetName = UPDATER_NAME,
-                    targetDir = UPDATER_DIST_DIR
+                    #targetName = UPDATER_NAME,
+                    #targetDir = UPDATER_DIST_DIR
                 )
             ]
         )
 
-        # # Dependencies are automatically detected, but it might need fine tuning.
-        # build_exe_options = {
-            # 'build_exe': APP_DIST_DIR,
-            # 'excludes': ["_ssl", "pydoc", "doctest", "test"],
-            # 'compressed': True
-        # }
+        # Dependencies are automatically detected, but it might need fine tuning.
+        build_exe_options = {
+            'build_exe': APP_DIST_DIR,
+            'excludes': ["_ssl", "pydoc", "doctest", "test"],
+            'compressed': True
+        }
 
-        # sys.path.append("build/")
-        # sys.argv = ["make.py", "build"]
-        # setup(
-            # name = APP_NAME,
-            # version = "1.0", # this version is meaningless for our purposes, but required
-            # options = {'build_exe': build_exe_options},
-            # executables = [
-                # Executable(
-                    # os.path.join(BUILD_DIR, MAIN_SCRIPT),
-                    # base = "Win32GUI",
-                    # targetName = APP_NAME + ".exe",
-                    # targetDir = APP_DIST_DIR,
-                    # icon = os.path.join(RESOURCE_SRC_PATH, "logo.ico")
-                # )
-            # ]
-        # )
+        sys.path.append("build/")
+        sys.argv = ["make.py", "build", "bdist_mac"]
+        setup(
+            name = APP_NAME,
+            version = "1.0", # this version is meaningless for our purposes, but required
+            options = {'build_exe': build_exe_options, 'bdist_mac': {'bundle_name': APP_NAME}},
+            executables = [
+                Executable(
+                    os.path.join(BUILD_DIR, MAIN_SCRIPT),
+                    #targetName = APP_NAME + ".exe",
+                    #targetDir = APP_DIST_DIR,
+                    icon = os.path.join(RESOURCE_SRC_PATH, "logo.ico")
+                )
+            ]
+        )
 
-        # # manually copy resource binary files
-        # resource_files = ["resources.data"]
-        # for resource_file in resource_files:
-            # src_path = os.path.join(BUILD_DIR, resource_file)
-            # dst_path = os.path.join(APP_DIST_DIR, resource_file)
-            # if os.path.isfile(src_path):
-                # print("Copy resource data file {} to {}".format(src_path, dst_path))
-                # shutil.copy(src_path, dst_path)
+        # manually copy resource binary files
+        resource_files = ["resources.data"]
+        for resource_file in resource_files:
+            src_path = os.path.join(BUILD_DIR, resource_file)
+            dst_path = os.path.join(APP_DIST_DIR, resource_file)
+            if os.path.isfile(src_path):
+                print("Copy resource data file {} to {}".format(src_path, dst_path))
+                shutil.copy(src_path, dst_path)
 
 
     # @staticmethod
