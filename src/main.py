@@ -13,7 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with the TSM Desktop Application.  If not, see <http://www.gnu.org/licenses/>.
 
-
 # Local modules
 from MainThread import MainThread
 import Config
@@ -23,12 +22,11 @@ from ui.MainWindow import MainWindow
 from ui.SettingsWindow import SettingsWindow
 
 # PyQt5
-from PyQt5.QtCore import pyqtSignal, QObject, Qt
+from PyQt5.QtCore import pyqtSignal, QObject, QStandardPaths, Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox
 
 # General python modules
-import argparse
 import logging
 from logging.handlers import RotatingFileHandler
 import os
@@ -40,7 +38,7 @@ class TSMApp(QObject):
     terms_accepted = pyqtSignal()
 
 
-    def __init__(self, args):
+    def __init__(self):
         QObject.__init__(self)
         # Create the QApplication
         self._app = QApplication(sys.argv)
@@ -50,10 +48,12 @@ class TSMApp(QObject):
         # initialize the logger
         logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s", datefmt="%m/%d/%Y %H:%M:%S")
         self._logger = logging.getLogger()
-        if not args.debug:
-            # remove default (stdout) handler
-            self._logger.handlers = []
+        # remove default (stdout) handler
+        self._logger.handlers = []
         self._logger.setLevel(logging.DEBUG)
+        app_data_dir = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
+        os.makedirs(app_data_dir, exist_ok=True)
+        Config.LOG_FILE_PATH = os.path.join(app_data_dir, "TSMApplication.log")
         handler = RotatingFileHandler(Config.LOG_FILE_PATH, mode='w', maxBytes=200000, backupCount=1)
         handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s", "%m/%d/%Y %H:%M:%S"))
         handler.doRollover() # clear the log everytime we start
@@ -89,6 +89,7 @@ class TSMApp(QObject):
         self._main_thread.set_main_window_accounting_accounts.connect(self._main_window.set_accounting_accounts)
         self._main_thread.show_desktop_notification.connect(self._main_window.show_notification)
         self._main_thread.set_main_window_title.connect(self._main_window.setWindowTitle)
+        self._main_thread.set_main_window_premium_button_visible.connect(self._main_window._ui.premium_button.setVisible)
         # connect settings window signals / slots
         self._settings_window.settings_changed.connect(self._main_thread.on_settings_changed)
         self._settings_window.upload_log_file.connect(self._main_thread.upload_log_file)
@@ -99,11 +100,19 @@ class TSMApp(QObject):
         self._main_thread.finished.connect(self._app.exit)
         self._main_thread.show_terms.connect(self.show_terms)
         self.terms_accepted.connect(self._main_thread.terms_accepted)
+        self._main_thread.run_updater.connect(self.run_updater)
         # start the thread
         self._main_thread.start()
 
         # Start the app
         self._app.exec_()
+
+
+    def run_updater(self):
+        self._logger.warn("Running updater!")
+        assert(Config.IS_WINDOWS) # TODO: figure out updating for mac
+        sys.argv[0] = os.path.abspath(os.path.join(os.path.dirname(sys.executable), os.pardir, Config.UPDATER_PATH))
+        os.execl(sys.argv[0], *sys.argv)
 
 
     def show_terms(self):
@@ -125,12 +134,10 @@ class TSMApp(QObject):
 if __name__ == "__main__":
     # Catch and log any exceptions that occur while running the app
     try:
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--debug", action="store_true", default=False)
-        args = parser.parse_args()
-        tsm_app = TSMApp(args)
+        tsm_app = TSMApp()
         tsm_app.run()
     except:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         logging.getLogger().error("".join(lines))
+        raise

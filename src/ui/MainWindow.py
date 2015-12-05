@@ -53,6 +53,8 @@ class MainWindow(QMainWindow):
         self._ui.accounts_dropdown.activated['QString'].connect(self.accounts_dropdown_changed)
         self._ui.realm_dropdown.activated['QString'].connect(self.realm_dropdown_changed)
         self._ui.export_button.clicked.connect(self.export_button_clicked)
+        self._ui.help_button.setProperty("url", "http://tradeskillmaster.com/site/getting-help")
+        self._ui.help_button.clicked.connect(self._link_button_clicked)
         self._ui.premium_button.setProperty("url", "http://tradeskillmaster.com/premium")
         self._ui.premium_button.clicked.connect(self._link_button_clicked)
         self._ui.logo_button.setProperty("url", "http://tradeskillmaster.com")
@@ -67,6 +69,7 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(data)
 
         # set properties which are necessary for tweaking the style
+        self._ui.help_button.setProperty("id", "premiumButton")
         self._ui.premium_button.setProperty("id", "premiumButton")
         self._ui.header_text.setProperty("id", "headerText")
 

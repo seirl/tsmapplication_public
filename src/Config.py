@@ -14,7 +14,6 @@
 # along with the TSM Desktop Application.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from PyQt5.QtCore import QStandardPaths
 import os
 import sys
 
@@ -29,12 +28,13 @@ assert(IS_WINDOWS != IS_MAC) # only one should be set
 ORG_NAME = "TradeSkillMaster"
 APP_NAME = "TSMApplication"
 CURRENT_VERSION = 300
-LOG_FILE_PATH = os.path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), "TSMApplication.log")
+LOG_FILE_PATH = None
 STATUS_CHECK_INTERVAL_S = 10 * 60
 APP_API_BASE_URL = "http://app-server.tradeskillmaster.com/v1"
 BACKUP_TIME_FORMAT = "%Y%m%d%H%M%S"
 BACKUP_NAME_SEPARATOR = "_"
 MAX_BLACK_MARKET_AGE = 24 * 60 * 60
+UPDATER_PATH = os.path.join("updater", "TSMUpdater.exe")
 
 # Default settings
 DEFAULT_SETTINGS = {

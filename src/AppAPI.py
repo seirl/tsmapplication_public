@@ -109,7 +109,7 @@ class AppAPI:
                     except ValueError:
                         # it was probably an error
                         raise ApiTransientError()
-                elif content_type == "application/zip":
+                elif content_type == "application/zip" or content_type == "application/octet-stream":
                     return raw_data
                 elif content_type == "application/json":
                     raw_data = raw_data.decode(response.info().get_param("charset", "utf-8"))
@@ -226,3 +226,11 @@ class AppAPI:
             self._make_request("groups", account, profile, data=data)
             return True
         return False
+
+
+    def app(self, path=None):
+        if path:
+            path = b64encode(path.encode("utf8")).decode("ascii")
+            return self._make_request("app", path)
+        else:
+            return self._make_request("app")

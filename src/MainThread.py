@@ -28,11 +28,13 @@ from PyQt5.QtWidgets import QMessageBox
 
 # General python modules
 from enum import Enum
-from hashlib import sha512
+from hashlib import md5, sha512
 from io import BytesIO
 import logging
+import os
 import psutil
 import re
+import shutil
 import sys
 from time import strftime, time
 import traceback
@@ -85,6 +87,8 @@ class MainThread(QThread):
     settings_changed = pyqtSignal()
     log_uploaded = pyqtSignal(bool)
     show_desktop_notification = pyqtSignal(str, bool)
+    run_updater = pyqtSignal()
+    set_main_window_premium_button_visible = pyqtSignal(bool)
 
 
     def __init__(self):
@@ -127,6 +131,7 @@ class MainThread(QThread):
         self._addon_versions = []
         self._data_sync_status = {}
         self._last_news = ""
+        self._is_logged_out = None
 
 
     def _wait_for_event(self, event):
@@ -253,8 +258,11 @@ class MainThread(QThread):
             self.show_terms.emit()
             self._wait_for_event(self.WaitEvent.TERMS_ACCEPTED)
             self._settings.accepted_terms = True
-        self.set_main_window_visible.emit(not is_logged_out)
-        self.set_login_window_visible.emit(is_logged_out)
+        if self._is_logged_out is None or self._is_logged_out != is_logged_out:
+            self._logger.debug("Changing visibility: {}".format(str(is_logged_out)))
+            self.set_main_window_visible.emit(not is_logged_out)
+            self.set_login_window_visible.emit(is_logged_out)
+            self._is_logged_out = is_logged_out
         if new_state == self.State.LOGGED_OUT:
             if old_state != self.State.INIT:
                 self.show_desktop_notification.emit("You've been logged out.", True)
@@ -263,6 +271,7 @@ class MainThread(QThread):
         elif new_state == self.State.PENDING_NEW_SESSION:
             pass
         elif new_state == self.State.VALID_SESSION:
+            self.set_main_window_premium_button_visible.emit(not self._api.get_is_premium())
             self._settings.has_beta_access = self._api.get_is_premium() or self._api.get_is_beta()
             self.settings_changed.emit()
             if old_state == self.State.LOGGED_OUT:
@@ -522,7 +531,7 @@ class MainThread(QThread):
             else:
                 raise Exception("Unexpected version type for {} ({}): {}".format(addon['name'], version_str, version_type))
             if status:
-                addon_status.append([{'text': name}, {'text': version_str}, status])
+                addon_status.append([{'text': name.replace("TradeSkillMaster_", "TSM_"), 'sort': name}, {'text': version_str}, status])
         self.set_main_window_addon_status_data.emit(addon_status)
 
 
@@ -608,6 +617,73 @@ class MainThread(QThread):
                 self._logger.error("Got error from group API: {}".format(str(e)))
 
 
+    def _get_file_md5(self, path):
+        with open(path, "rb") as f:
+            return md5(f.read()).hexdigest()
+
+
+    def _update_app(self):
+        # TODO: this probably won't work on mac
+        # don't try to update if we're not frozen
+        if not getattr(sys, 'frozen', False):
+            return
+
+        base_path = os.path.abspath(os.path.join(os.path.dirname(sys.executable), os.pardir))
+        os.chdir(base_path)
+        app_path = os.path.join(base_path, "app")
+
+        # create a manifest (look table of path -> hash) for the current app files
+        app_file_md5 = {}
+        for root_path, _, files in os.walk(app_path):
+            root_path = os.path.relpath(root_path, app_path)
+            for file_name in files:
+                path = file_name if root_path == "." else os.path.join(root_path, file_name).replace("\\", "/")
+                app_file_md5[path] = self._get_file_md5(os.path.join(app_path, path))
+
+        # grab the latest manifest
+        try:
+            new_app_files = self._api.app()['files']
+        except (ApiError, ApiTransientError) as e:
+            self._logger.error("Got error from app API: {}".format(str(e)))
+            return
+
+        # create the app_new folder - copy files that haven't changed and download files which have
+        app_new_path = os.path.join(base_path, "app_new")
+        copy_file_list = []
+        download_file_list = []
+        if os.path.exists(app_new_path):
+            shutil.rmtree(app_new_path)
+        for file_info in new_app_files:
+            file_path = file_info['path']
+            dst_path = os.path.join(app_new_path, file_path)
+            if file_info['md5'] == app_file_md5[file_path]:
+                # this file hasn't changed so just copy it
+                copy_file_list.append((os.path.join(app_path, file_path), dst_path))
+            else:
+                # we need to download this file
+                download_file_list.append((file_path, dst_path))
+        if not download_file_list:
+            # nothing to update, so bail
+            self._logger.warn("There were no new files to download for the update.")
+            return
+        # copy the files
+        for src, dst in copy_file_list:
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copyfile(src, dst)
+        # download the necesary files
+        for file_path, dst in download_file_list:
+            try:
+                with open(dst, 'wb') as f:
+                    f.write(self._api.app(file_path))
+                self._logger.info("Downloaded file: {}".format(dst))
+            except (ApiTransientError, ApiError) as e:
+                # abort - we'll try again later
+                self._logger.error("App file download error: {}".format(str(e)))
+                return
+        self.run_updater.emit()
+        # assert(False) # we should never get here!
+
+
     def _run_fsm(self):
         self._sleep_time = 0
         if self._state == self.State.INIT:
@@ -623,6 +699,7 @@ class MainThread(QThread):
                 self._sleep_time = Config.STATUS_CHECK_INTERVAL_S
         elif self._state == self.State.VALID_SESSION:
             self._sleep_time = Config.STATUS_CHECK_INTERVAL_S
+            self._update_app()
             if not self._wow_helper.has_valid_wow_path():
                 self.show_desktop_notification.emit("You need to select your WoW directory in the settings!", True)
                 self.set_main_window_header_text.emit("<font color='red'>You need to select your WoW directory in the settings!</font>")
@@ -651,4 +728,5 @@ class MainThread(QThread):
         except:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-            logging.getLogger().error("".join(lines))
+            self._logger.error("".join(lines))
+            raise

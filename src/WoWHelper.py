@@ -81,8 +81,7 @@ class WoWHelper(QObject):
 
     def _get_backup_path(self):
         backup_path = os.path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), "Backups")
-        if not os.path.exists(backup_path):
-            os.makedirs(backup_path)
+        os.makedirs(backup_path, exist_ok=True)
         return backup_path
 
 
