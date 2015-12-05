@@ -62,40 +62,6 @@ UPDATER_NAME = "TSMUpdater"
 # path inno setup's ISCC.exe file (for dist_win)
 ISCC_PATH = "\"C:\\Program Files (x86)\\Inno Setup 5\\ISCC.exe\""
 
-# template for resource script which loads a compressed resource file
-RESOURCE_CODE = """
-# WARNING: This code is generated. All changes made in this file will be lost!
-
-import os
-import sys
-
-rel_path = "{}"
-if getattr(sys, 'frozen', False):
-    _resource_data_path = os.path.join(os.path.dirname(sys.executable), rel_path)
-else:
-    _resource_data_path = os.path.join(os.path.dirname(sys.argv[0]), rel_path)
-with open(_resource_data_path, "rb") as f:
-    def get_length():
-        return (2 ** 24) * ord(f.read(1)) + (2 ** 16) * ord(f.read(1)) + (2 ** 8) * ord(f.read(1)) + ord(f.read(1))
-    struct_len = get_length()
-    name_len = get_length()
-    data_len = get_length()
-    import os
-    assert(os.path.getsize(_resource_data_path) == (struct_len + name_len + data_len + 12))
-    qt_resource_struct = f.read(struct_len)
-    qt_resource_name = f.read(name_len)
-    qt_resource_data = f.read(data_len)
-
-assert(len(qt_resource_struct) > 0 and len(qt_resource_name) > 0 and len(qt_resource_data) > 0)
-
-from PyQt5 import QtCore
-def qInitResources():
-    QtCore.qRegisterResourceData(0x01, qt_resource_struct, qt_resource_name, qt_resource_data)
-def qCleanupResources():
-    QtCore.qUnregisterResourceData(0x01, qt_resource_struct, qt_resource_name, qt_resource_data)
-qInitResources()
-"""
-
 # template for Inno Setup script
 INNO_SETUP_CODE = r"""
 #define MyAppName "TradeSkillMaster Application"
@@ -225,17 +191,6 @@ class Operations:
             if os.system("pyrcc5 {} -o {}".format(path, built_file_path)) != 0:
                 print("Failed to compile resource: {}".format(path))
                 sys.exit(1)
-            # compress the resource file
-            module = import_module("build.{}_rc".format(file_name))
-            with open(os.path.join(BUILD_DIR, "resources.data"), 'wb') as f:
-                f.write(len(module.qt_resource_struct).to_bytes(4, byteorder="big"))
-                f.write(len(module.qt_resource_name).to_bytes(4, byteorder="big"))
-                f.write(len(module.qt_resource_data).to_bytes(4, byteorder="big"))
-                f.write(module.qt_resource_struct)
-                f.write(module.qt_resource_name)
-                f.write(module.qt_resource_data)
-            with open(built_file_path, 'w') as f:
-                f.write(RESOURCE_CODE.format("resources.data"))
 
         # compile the UI files
         for path in find_files(UI_SRC_PATH, "*.ui"):
@@ -309,15 +264,6 @@ class Operations:
                 print("Copy DLL {} to {}".format(src_path, dst_path))
                 shutil.copy(src_path, dst_path)
 
-        # manually copy resource binary files
-        resource_files = ["resources.data"]
-        for resource_file in resource_files:
-            src_path = os.path.join(BUILD_DIR, resource_file)
-            dst_path = os.path.join(APP_DIST_DIR, resource_file)
-            if os.path.isfile(src_path):
-                print("Copy resource data file {} to {}".format(src_path, dst_path))
-                shutil.copy(src_path, dst_path)
-
         # generate the ISS file
         source_lines = []
         for root_path, _, files in os.walk(APP_DIST_DIR):
@@ -350,84 +296,59 @@ class Operations:
 
         # Dependencies are automatically detected, but it might need fine tuning.
         build_exe_options = {
-            #'build_exe': UPDATER_DIST_DIR,
+            'build_exe': UPDATER_DIST_DIR,
             'excludes': ["_ssl", "pydoc", "doctest", "test", "_hashlib", "_bz2", "_lzma", "zipfile", "gzip", "unicodedata", "logging"],
             'compressed': True
         }
 
-        sys.argv = ["make.py", "build", "bdist_mac"]
+        sys.argv = ["make.py", "build"]
         setup(
             name = UPDATER_NAME,
             version = "1.0", # this version is meaningless for our purposes, but required
-            options = {'build_exe': build_exe_options, 'bdist_mac': {'bundle_name': UPDATER_NAME}},
+            options = {'build_exe': build_exe_options},
             executables = [
                 Executable(
                     UDPATER_MAIN_SCRIPT_PATH,
-                    #targetName = UPDATER_NAME,
-                    #targetDir = UPDATER_DIST_DIR
+                    targetName = UPDATER_NAME,
+                    targetDir = UPDATER_DIST_DIR
                 )
             ]
         )
 
         # Dependencies are automatically detected, but it might need fine tuning.
         build_exe_options = {
-            'build_exe': APP_DIST_DIR,
+#            'build_exe': APP_DIST_DIR,
             'excludes': ["_ssl", "pydoc", "doctest", "test"],
             'compressed': True
         }
 
         sys.path.append("build/")
-        sys.argv = ["make.py", "build", "bdist_mac"]
+        sys.argv = ["make.py", "build", "bdist_mac", "bdist_dmg"]
         setup(
             name = APP_NAME,
             version = "1.0", # this version is meaningless for our purposes, but required
-            options = {'build_exe': build_exe_options, 'bdist_mac': {'bundle_name': APP_NAME}},
+            options = {
+                'build_exe': build_exe_options,
+                'bdist_mac': {'bundle_name': APP_NAME, 'iconfile': os.path.join(RESOURCE_SRC_PATH, "logo.icns")},
+                'bdist_dmg': {'applications_shortcut': True, 'volume_label': "TSMApplication"}},
             executables = [
                 Executable(
                     os.path.join(BUILD_DIR, MAIN_SCRIPT),
-                    #targetName = APP_NAME + ".exe",
-                    #targetDir = APP_DIST_DIR,
-                    icon = os.path.join(RESOURCE_SRC_PATH, "logo.ico")
+                    targetName = APP_NAME,
+                    icon = os.path.join(RESOURCE_SRC_PATH, "logo.icns")
                 )
             ]
         )
 
-        # manually copy resource binary files
-        resource_files = ["resources.data"]
-        for resource_file in resource_files:
-            src_path = os.path.join(BUILD_DIR, resource_file)
-            dst_path = os.path.join(APP_DIST_DIR, resource_file)
-            if os.path.isfile(src_path):
-                print("Copy resource data file {} to {}".format(src_path, dst_path))
-                shutil.copy(src_path, dst_path)
-
-
-    # @staticmethod
-    # def dist_mac():
-        # assert(sys.platform.startswith("darwin"))
-        # from setuptools import setup
-        # sys.path.append("build/")
-
-        # # setuptools uses argv, so we'll just fake it
-        # sys.argv = ["make.py"]
-        # import py2app
-        # sys.argv.append("py2app")
-
-        # setup(
-            # name = APP_NAME,
-            # app = [os.path.join(BUILD_DIR, MAIN_SCRIPT)],
-            # options = {
-                # 'py2app': {
-                    # 'argv_emulation': True,
-                    # 'iconfile': "resources/logo.icns",
-                    # 'includes': ["sip"],
-                    # 'dist_dir': APP_DIST_DIR,
-                    # 'excludes': ["_ssl", 'pydoc', 'doctest', 'test'],
-                    # 'compressed': True,
-                # }
-            # },
-            # setup_requires = ['py2app'],
-        # )
+        # hack the .app to be structured like we want
+        with open("build/TSMApplication.app/Contents/Info.plist") as f:
+            lines = [x.replace("TSMApplication", "app/TSMApplication") for x in f]
+        with open("build/TSMApplication.app/Contents/Info.plist", "w") as f:
+            f.write("".join(lines))
+        os.rename("build/TSMApplication.app/Contents/MacOS", "build/TSMApplication.app/Contents/app")
+        os.mkdir("build/TSMApplication.app/Contents/MacOS")
+        os.rename("build/TSMApplication.app/Contents/app", "build/TSMApplication.app/Contents/MacOS/app")
+        os.rename("build/updater", "build/TSMApplication.app/Contents/MacOS/updater")
 
 
 if __name__ == "__main__":

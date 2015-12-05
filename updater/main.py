@@ -23,6 +23,8 @@ from shutil import rmtree, copytree
 import sys
 import time
 
+APP_NAME = "TSMApplication.exe" if sys.platform.startswith("win32") else "TSMApplication"
+
 
 class TSMUpdater:
     def __init__(self):
@@ -69,10 +71,10 @@ class TSMUpdater:
             # brief sleep to let the folder updates settle
             time.sleep(1)
             self._log_msg("Success!")
-            self._log_msg("Launching app ({})!".format(os.path.join(self._cwd, "app", "TSMApplication.exe")))
+            self._log_msg("Launching app ({})!".format(os.path.join(self._cwd, "app", APP_NAME)))
             self._close_log()
             # run the new app
-            sys.argv = [os.path.join(self._cwd, "app", "TSMApplication.exe")]
+            sys.argv = [os.path.join(self._cwd, "app", APP_NAME)]
             os.execl(sys.argv[0], *sys.argv)
         except:
             # well this is bad...hopefully we can at least log what happened

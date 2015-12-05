@@ -231,6 +231,6 @@ class AppAPI:
     def app(self, path=None):
         if path:
             path = b64encode(path.encode("utf8")).decode("ascii")
-            return self._make_request("app", path)
+            return self._make_request("app", "win" if Config.IS_WINDOWS else "mac", path)
         else:
-            return self._make_request("app")
+            return self._make_request("app", "win" if Config.IS_WINDOWS else "mac")

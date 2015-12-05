@@ -110,7 +110,6 @@ class TSMApp(QObject):
 
     def run_updater(self):
         self._logger.warn("Running updater!")
-        assert(Config.IS_WINDOWS) # TODO: figure out updating for mac
         sys.argv[0] = os.path.abspath(os.path.join(os.path.dirname(sys.executable), os.pardir, Config.UPDATER_PATH))
         os.execl(sys.argv[0], *sys.argv)
 

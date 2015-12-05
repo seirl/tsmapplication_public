@@ -623,9 +623,6 @@ class MainThread(QThread):
 
 
     def _update_app(self):
-        # TODO: this won't work on mac
-        if not Config.IS_WINDOWS:
-            return
         # don't try to update if we're not frozen
         if not getattr(sys, 'frozen', False):
             return
@@ -658,7 +655,7 @@ class MainThread(QThread):
         for file_info in new_app_files:
             file_path = file_info['path']
             dst_path = os.path.join(app_new_path, file_path)
-            if file_info['md5'] == app_file_md5[file_path]:
+            if file_path in app_file_md5 and file_info['md5'] == app_file_md5[file_path]:
                 # this file hasn't changed so just copy it
                 copy_file_list.append((os.path.join(app_path, file_path), dst_path))
             else:
@@ -683,7 +680,8 @@ class MainThread(QThread):
                 self._logger.error("App file download error: {}".format(str(e)))
                 return
         self.run_updater.emit()
-        # assert(False) # we should never get here!
+        self.sleep(10)
+        assert(False) # we should never get here!
 
 
     def _run_fsm(self):

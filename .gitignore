@@ -3,6 +3,7 @@ __pycache__/
 build/
 dist/
 .DS_STORE
+*.swp
 
 TSMApplication.log*
 
