@@ -492,7 +492,6 @@ class MainThread(QThread):
             except (ApiError, ApiTransientError) as e:
                 # log an error and keep going
                 self._logger.error("Got error from WoWuction API: {}".format(str(e)))
-                hit_error = True
         app_data.update("APP_INFO", "Global", "{{version={}}}".format(Config.CURRENT_VERSION), int(time()))
         app_data.save()
         self._update_data_sync_status()
@@ -722,6 +721,7 @@ class MainThread(QThread):
 
 
     def run(self):
+        # TODO: add restart reason + desktop notification for interesting ones
         try:
             while True:
                 self._run_fsm()

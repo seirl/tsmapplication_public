@@ -213,6 +213,7 @@ class Operations:
         build_exe_options = {
             'build_exe': UPDATER_DIST_DIR,
             'excludes': ["_ssl", "pydoc", "doctest", "test", "_hashlib", "_bz2", "_lzma", "zipfile", "gzip", "unicodedata", "logging"],
+            'include_msvcr': True,
             'compressed': True
         }
 
@@ -235,6 +236,7 @@ class Operations:
         build_exe_options = {
             'build_exe': APP_DIST_DIR,
             'excludes': ["_ssl", "pydoc", "doctest", "test"],
+            'include_msvcr': True,
             'compressed': True
         }
 

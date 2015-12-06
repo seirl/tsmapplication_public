@@ -1,4 +1,2 @@
 psutil
-py2exe
-pyreadline
-pypiwin32
+cx_Freeze

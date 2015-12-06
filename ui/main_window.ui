@@ -501,7 +501,7 @@
       <item>
        <widget class="QToolButton" name="help_button">
         <property name="text">
-         <string>Get Help with TSM</string>
+         <string>Get Help</string>
         </property>
        </widget>
       </item>
