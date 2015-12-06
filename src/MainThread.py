@@ -671,6 +671,7 @@ class MainThread(QThread):
         # download the necesary files
         for file_path, dst in download_file_list:
             try:
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
                 with open(dst, 'wb') as f:
                     f.write(self._api.app(file_path))
                 self._logger.info("Downloaded file: {}".format(dst))
