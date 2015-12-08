@@ -112,6 +112,8 @@ class MainThread(QThread):
                 self._settings.tsm3_beta = (WoWHelper().get_installed_version("TradeSkillMaster")[0] == WoWHelper.BETA_VERSION)
                 self._logger.info("Imported old settings!")
         self._settings.version = Config.CURRENT_VERSION
+        self._prev_close_reason = self._settings.close_reason
+        self._settings.close_reason = Config.CLOSE_REASON_UNKNOWN
 
         # initialize other helper classes
         self._api = AppAPI()
@@ -722,8 +724,18 @@ class MainThread(QThread):
 
 
     def run(self):
-        # TODO: add restart reason + desktop notification for interesting ones
-        self._logger.info("Close reason is {}".format(self._settings.close_reason))
+        self._logger.info("Previous close reason is {}".format(self._prev_close_reason))
+        if self._prev_close_reason == Config.CLOSE_REASON_UPDATE:
+            self.show_desktop_notification.emit("The TSM Application has been updated to r{}!".format(Config.CURRENT_VERSION), False)
+        elif self._prev_close_reason == Config.CLOSE_REASON_CRASH:
+            # attempt to upload the previous log
+            prev_log_path = Config.LOG_FILE_PATH + ".1"
+            if os.path.isfile(prev_log_path):
+                with open(prev_log_path) as log_file:
+                    try:
+                        self._api.log(log_file.read(), True)
+                    except (ApiTransientError, ApiError) as e:
+                        pass
         try:
             while True:
                 self._run_fsm()

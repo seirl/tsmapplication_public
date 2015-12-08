@@ -40,6 +40,7 @@ UPDATER_PATH = os.path.join("updater", "TSMUpdater.exe") if IS_WINDOWS else os.p
 CLOSE_REASON_NORMAL = 0
 CLOSE_REASON_CRASH = 1
 CLOSE_REASON_UPDATE = 2
+CLOSE_REASON_UNKNOWN = 99
 
 # Default settings
 DEFAULT_SETTINGS = {
