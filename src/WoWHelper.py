@@ -413,7 +413,10 @@ class WoWHelper(QObject):
                     for i, record in enumerate(data):
                         item_string_parts = record['itemString'].split(":")
                         if item_string_parts[0] == "i":
-                            yield int(item_string_parts[1]), int(record['price']), int(record['stackSize']), int(record['quantity']), int(record['time']), int(save_times[i])
+                            try:
+                                yield int(item_string_parts[1]), int(record['price']), int(record['stackSize']), int(record['quantity']), int(record['time']), int(save_times[i])
+                            except ValueError:
+                                pass
                 for item_id, price, stack_size, quantity, sale_time, save_time in process_data_iterator(sales, save_time_sales):
                     if item_id not in account_data['data']:
                         account_data['data'][item_id] = []

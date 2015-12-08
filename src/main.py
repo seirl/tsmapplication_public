@@ -40,6 +40,7 @@ class TSMApp(QObject):
 
     def __init__(self):
         QObject.__init__(self)
+        self._settings = None
         # Create the QApplication
         self._app = QApplication(sys.argv)
         self._app.setOrganizationName(Config.ORG_NAME)
@@ -67,6 +68,7 @@ class TSMApp(QObject):
         self._login_window = LoginWindow()
         self._main_window = MainWindow()
         self._settings_window = SettingsWindow(self._main_window)
+        self._settings = load_settings(Config.DEFAULT_SETTINGS)
 
         # Setup the main thread which handles all the business logic
         self._main_thread = MainThread()
@@ -109,6 +111,7 @@ class TSMApp(QObject):
 
 
     def run_updater(self):
+        self._settings.close_reason = Config.CLOSE_REASON_UPDATE
         self._logger.warn("Running updater!")
         sys.argv[0] = os.path.abspath(os.path.join(os.path.dirname(sys.executable), os.pardir, Config.UPDATER_PATH))
         os.execl(sys.argv[0], *sys.argv)
@@ -135,8 +138,11 @@ if __name__ == "__main__":
     try:
         tsm_app = TSMApp()
         tsm_app.run()
+        # the user closed the app normally
+        tsm_app._settings.close_reason = Config.CLOSE_REASON_NORMAL
     except:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         logging.getLogger().error("".join(lines))
+        tsm_app._settings.close_reason = Config.CLOSE_REASON_CRASH
         raise

@@ -573,7 +573,7 @@ class MainThread(QThread):
     def _update_backup_status(self):
         backup_status = []
         for info in self._wow_helper.get_backups():
-            time_info = {'text': info['timestamp'].strftime("%c"), 'sort': int(info['timestamp'].timestamp())}
+            time_info = {'text': info['timestamp'].strftime("%c"), 'sort': int(float(info['timestamp'].timestamp()))}
             assert("~" not in info['account'])
             notes_info = {'text': "Double-click to restore", 'click_key':"backup~{}~{}".format(info['account'], info['timestamp'].strftime(Config.BACKUP_TIME_FORMAT))}
             backup_status.append([{'text': info['account']}, time_info, notes_info])
@@ -723,6 +723,7 @@ class MainThread(QThread):
 
     def run(self):
         # TODO: add restart reason + desktop notification for interesting ones
+        self._logger.info("Close reason is {}".format(self._settings.close_reason))
         try:
             while True:
                 self._run_fsm()
@@ -730,4 +731,5 @@ class MainThread(QThread):
             exc_type, exc_value, exc_traceback = sys.exc_info()
             lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
             self._logger.error("".join(lines))
+            self._settings.close_reason = Config.CLOSE_REASON_CRASH
             raise

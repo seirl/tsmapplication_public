@@ -36,6 +36,11 @@ BACKUP_NAME_SEPARATOR = "_"
 MAX_BLACK_MARKET_AGE = 24 * 60 * 60
 UPDATER_PATH = os.path.join("updater", "TSMUpdater.exe") if IS_WINDOWS else os.path.join("updater", "TSMUpdater")
 
+# close reasons
+CLOSE_REASON_NORMAL = 0
+CLOSE_REASON_CRASH = 1
+CLOSE_REASON_UPDATE = 2
+
 # Default settings
 DEFAULT_SETTINGS = {
     'version': 0,
@@ -54,6 +59,7 @@ DEFAULT_SETTINGS = {
     'realm_data_notification': True,
     'addon_notification': True,
     'backup_notification': True,
+    'close_reason': CLOSE_REASON_NORMAL,
 }
 DEFAULT_OLD_LOGIN_SETTINGS = {
     'userId': 0,

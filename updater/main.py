@@ -58,9 +58,10 @@ class TSMUpdater:
 
 
     def run(self):
-        success = False
         try:
-            assert(os.path.isdir(self._cwd, "app_new"))
+            if not os.path.isdir(self._cwd, "app_new"):
+                self._log_msg("The app_new folder doesn't exit!")
+                sys.exit(1)
             self._log_msg("Swapping folders...")
             # brief sleep to make sure the app closed completely
             time.sleep(1)
