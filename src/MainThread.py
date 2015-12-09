@@ -36,7 +36,7 @@ import psutil
 import re
 import shutil
 import sys
-from time import strftime, time
+from time import sleep, strftime, time
 import traceback
 from zipfile import ZipFile
 
@@ -245,12 +245,14 @@ class MainThread(QThread):
 
 
     def reset_settings(self):
-        self._settings.settings.clear()
+        while self._state == self.State.VALID_SESSION:
+            sleep(1)
+        for key, value in Config.DEFAULT_SETTINGS.items():
+            setattr(self._settings, key, value)
         self._settings.version = Config.CURRENT_VERSION
         self._wow_helper.set_wow_path("")
-        self.stop_sleeping()
-        # TODO: fix crash if we're in the middle of the VALID_SESSION state
         self._set_fsm_state(self.State.LOGGED_OUT)
+        self.set_login_window_form_values.emit("", "")
 
 
     def stop_sleeping(self):
@@ -274,7 +276,8 @@ class MainThread(QThread):
         old_state = self._state
         self._state = new_state
         if not self.State.is_valid_transition(old_state, new_state):
-            raise Exception("Invalid state transtion from {} to {}!".format(old_state, new_state))
+            self._logger.error("Invalid state transtion from {} to {}!".format(old_state, new_state))
+            return
 
         self._logger.info("Set FSM state to {}".format(new_state))
         is_logged_out = (new_state == self.State.LOGGED_OUT)
@@ -713,6 +716,7 @@ class MainThread(QThread):
         self._sleep_time = 0
         if self._state == self.State.INIT:
             # just go to the next state - this is so we can show the login window when we enter LOGGED_OUT
+            self.set_login_window_form_values.emit(self._settings.email, "********")
             self._set_fsm_state(self.State.LOGGED_OUT)
         elif self._state == self.State.LOGGED_OUT:
             # process login requests (which will move us to VALID_SESSION)
