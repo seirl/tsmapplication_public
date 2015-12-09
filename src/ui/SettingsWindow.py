@@ -34,6 +34,7 @@ class SettingsWindow(QMainWindow):
     settings_changed = pyqtSignal(str)
     upload_log_file = pyqtSignal()
     reset_settings = pyqtSignal()
+    run_at_startup_changed = pyqtSignal()
 
 
     def __init__(self, parent):
@@ -128,6 +129,8 @@ class SettingsWindow(QMainWindow):
         setattr(self._settings, setting_key, checked == Qt.Checked)
         if setting_key == "tsm3_beta":
             self.settings_changed.emit(self._settings.wow_path)
+        elif setting_key == "run_at_startup":
+            self.run_at_startup_changed.emit()
 
 
     def backup_period_dropdown_changed(self, index):

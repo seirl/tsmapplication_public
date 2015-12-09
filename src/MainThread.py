@@ -114,6 +114,7 @@ class MainThread(QThread):
         self._settings.version = Config.CURRENT_VERSION
         self._prev_close_reason = self._settings.close_reason
         self._settings.close_reason = Config.CLOSE_REASON_UNKNOWN
+        self.update_run_at_startup()
 
         # initialize other helper classes
         self._api = AppAPI()
@@ -162,6 +163,28 @@ class MainThread(QThread):
 
     def login_button_clicked(self, email, password):
         self._fire_wait_event(self.WaitEvent.LOGIN_BUTTON, (email, password))
+
+
+    def update_run_at_startup(self):
+        if not getattr(sys, 'frozen', False):
+            self._logger.debug("Skipping run at startup for non-frozen app!")
+            return
+        self._logger.info("Updating run at startup setting: ".format(str(self._settings.run_at_startup)))
+        if Config.IS_WINDOWS:
+            reg_settings = QSettings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings.NativeFormat)
+            if self._settings.run_at_startup:
+                reg_settings.setValue("TSMApplication", "\"{}\"".format(os.path.abspath(sys.executable).replace("/", "\\")))
+            else:
+                reg_settings.remove("TSMApplication")
+            reg_settings.sync()
+        elif Config.IS_MAC:
+            if self._settings.run_at_startup:
+                app_path = os.path.abspath(os.path.join(os.path.dirname(sys.executable), os.pardir, os.pardir, os.pardir)) + "/"
+                os.system("osascript -e 'tell application \"System Events\" to make login item at end with properties {path:\"{}\", hidden:false}'".format(app_path))
+            else:
+                os.system("osascript -e 'tell application \"System Events\" to delete login item \"TSMApplication\"'")
+        else:
+            raise Exception("Unexpected platform")
 
 
     def status_table_clicked(self, click_key):
@@ -727,7 +750,7 @@ class MainThread(QThread):
         self._logger.info("Previous close reason is {}".format(self._prev_close_reason))
         if self._prev_close_reason == Config.CLOSE_REASON_UPDATE:
             self.show_desktop_notification.emit("The TSM Application has been updated to r{}!".format(Config.CURRENT_VERSION), False)
-        elif self._prev_close_reason == Config.CLOSE_REASON_CRASH:
+        elif self._prev_close_reason == Config.CLOSE_REASON_CRASH and getattr(sys, 'frozen', False):
             # attempt to upload the previous log
             prev_log_path = Config.LOG_FILE_PATH + ".1"
             if os.path.isfile(prev_log_path):

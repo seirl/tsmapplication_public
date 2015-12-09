@@ -96,6 +96,7 @@ class TSMApp(QObject):
         self._settings_window.settings_changed.connect(self._main_thread.on_settings_changed)
         self._settings_window.upload_log_file.connect(self._main_thread.upload_log_file)
         self._settings_window.reset_settings.connect(self._main_thread.reset_settings)
+        self._settings_window.run_at_startup_changed.connect(self._main_thread.update_run_at_startup)
         self._main_thread.settings_changed.connect(self._settings_window.on_settings_changed)
         self._main_thread.log_uploaded.connect(self._settings_window.log_uploaded)
         # connect general signals / slots
