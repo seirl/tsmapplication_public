@@ -124,9 +124,11 @@ class SettingsWindow(QMainWindow):
 
     def checkbox_changed(self, checked):
         if self._ignore_changes:
+            logging.getLogger().debug("Ignoring setting changes")
             return
         setting_key = self.sender().property("setting_key")
         setattr(self._settings, setting_key, checked == Qt.Checked)
+        logging.getLogger().debug("Setting {} ({}, {})".format(str(setting_key), str(checked == Qt.Checked), getattr(self._settings, setting_key)))
         if setting_key == "tsm3_beta":
             self.settings_changed.emit(self._settings.wow_path)
         elif setting_key == "run_at_startup":

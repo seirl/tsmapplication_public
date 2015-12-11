@@ -716,7 +716,7 @@ class MainThread(QThread):
         self._sleep_time = 0
         if self._state == self.State.INIT:
             # just go to the next state - this is so we can show the login window when we enter LOGGED_OUT
-            self.set_login_window_form_values.emit(self._settings.email, "********")
+            self.set_login_window_form_values.emit(self._settings.email, "********" if self._settings.email else "")
             self._set_fsm_state(self.State.LOGGED_OUT)
         elif self._state == self.State.LOGGED_OUT:
             # process login requests (which will move us to VALID_SESSION)
