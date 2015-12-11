@@ -319,20 +319,20 @@ class Operations:
 
         # Dependencies are automatically detected, but it might need fine tuning.
         build_exe_options = {
-#            'build_exe': APP_DIST_DIR,
             'excludes': ["_ssl", "pydoc", "doctest", "test"],
             'compressed': True
         }
 
         sys.path.append("build/")
-        sys.argv = ["make.py", "build", "bdist_mac", "bdist_dmg"]
+        sys.argv = ["make.py", "build", "bdist_mac"]
         setup(
             name = APP_NAME,
             version = "1.0", # this version is meaningless for our purposes, but required
             options = {
                 'build_exe': build_exe_options,
                 'bdist_mac': {'bundle_name': APP_NAME, 'iconfile': os.path.join(RESOURCE_SRC_PATH, "logo.icns")},
-                'bdist_dmg': {'applications_shortcut': True, 'volume_label': "TSMApplication"}},
+                #'bdist_dmg': {'applications_shortcut': True, 'volume_label': "TSMApplication"}
+            },
             executables = [
                 Executable(
                     os.path.join(BUILD_DIR, MAIN_SCRIPT),
@@ -351,7 +351,38 @@ class Operations:
         os.mkdir("build/TSMApplication.app/Contents/MacOS")
         os.rename("build/TSMApplication.app/Contents/app", "build/TSMApplication.app/Contents/MacOS/app")
         os.rename("build/updater", "build/TSMApplication.app/Contents/MacOS/updater")
+        Operations.buildDMG()
 
+
+    @staticmethod
+    def buildDMG():
+        dmgName = "TSMApplication.dmg"
+        # Remove DMG if it already exists
+        if os.path.exists(dmgName):
+            os.unlink(dmgName)
+
+        createargs = [
+            'hdiutil', 'create', '-fs', 'HFSX', '-format', 'UDZO',
+            "build/"+dmgName, '-imagekey', 'zlib-level=9', '-srcfolder',
+            "build/TSMApplication.app", '-volname', "TSMApplication"
+        ]
+
+        if True:
+            scriptargs = [
+                'osascript', '-e', 'tell application "Finder" to make alias \
+                file to POSIX file "/Applications" at POSIX file "%s"' %
+                os.path.realpath("build")
+            ]
+
+            if os.spawnvp(os.P_WAIT, 'osascript', scriptargs) != 0:
+                raise OSError('creation of Applications shortcut failed')
+
+            createargs.append('-srcfolder')
+            createargs.append("build" + '/Applications')
+
+        # Create the dmg
+        if os.spawnvp(os.P_WAIT, 'hdiutil', createargs) != 0:
+            raise OSError('creation of the dmg failed')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
