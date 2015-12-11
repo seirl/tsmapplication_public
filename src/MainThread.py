@@ -180,7 +180,7 @@ class MainThread(QThread):
         elif Config.IS_MAC:
             if self._settings.run_at_startup:
                 app_path = os.path.abspath(os.path.join(os.path.dirname(sys.executable), os.pardir, os.pardir, os.pardir)) + "/"
-                os.system("osascript -e 'tell application \"System Events\" to make login item at end with properties {path:\"{}\", hidden:false}'".format(app_path))
+                os.system("osascript -e 'tell application \"System Events\" to make login item at end with properties {{path:\"{}\", hidden:false}}'".format(app_path))
             else:
                 os.system("osascript -e 'tell application \"System Events\" to delete login item \"TSMApplication\"'")
         else:
