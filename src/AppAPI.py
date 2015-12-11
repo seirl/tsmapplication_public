@@ -151,7 +151,7 @@ class AppAPI:
 
 
     def login(self, email, password):
-        email_hash = sha256(email.encode("utf-8")).hexdigest()
+        email_hash = sha256(email.lower().encode("utf-8")).hexdigest()
         password_hash = sha512((password + PrivateConfig.get_password_salt()).encode("utf-8")).hexdigest()
         self._user_info = self._make_request("login", email_hash, password_hash)
         self._last_login = time()

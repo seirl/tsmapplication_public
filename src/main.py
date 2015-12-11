@@ -136,6 +136,7 @@ class TSMApp(QObject):
 
 if __name__ == "__main__":
     # Catch and log any exceptions that occur while running the app
+    tsm_app = None
     try:
         tsm_app = TSMApp()
         tsm_app.run()
@@ -145,5 +146,6 @@ if __name__ == "__main__":
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         logging.getLogger().error("".join(lines))
-        tsm_app._settings.close_reason = Config.CLOSE_REASON_CRASH
+        if tsm_app:
+            tsm_app._settings.close_reason = Config.CLOSE_REASON_CRASH
         raise
