@@ -23,6 +23,7 @@ from base64 import b64encode
 from hashlib import md5, sha1, sha256, sha512
 from gzip import GzipFile
 from io import BytesIO, StringIO
+import http
 import json
 import logging
 import socket
@@ -123,7 +124,7 @@ class AppAPI:
                         raise ApiError(data['error'])
                     # this request was successful
                     return data
-        except (URLError, socket.timeout) as e:
+        except (URLError, socket.timeout, http.client.BadStatusLine) as e:
             # the request failed (weren't able to connect to the server)
             if isinstance(e, HTTPError):
                 logger.error("Got HTTP status code of {} ({})".format(e.code, e.reason))
