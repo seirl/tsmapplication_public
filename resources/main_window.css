@@ -112,3 +112,15 @@ QTableView::item  {
 	border-left: 1px solid black;
 	border-bottom: 1px solid black;
 }
+
+
+/* checkboxes */
+QCheckBox::indicator:checked {
+	background: qradialgradient(cx:0.5, cy:0.5, radius: 1, fx:0.5, fy:0.5, stop:0 rgb(229, 200, 150), stop:0.5 rgb(229, 112, 0), stop:1 rgb(70, 70, 70));
+	/*background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 rgb(50, 50, 50), stop: 0.5 rgb(229, 112, 0), stop: 1 rgb(50, 50, 50));*/
+	/* background-color: rgb(229, 112, 0); */
+}
+
+QCheckBox::indicator:unchecked {
+	background-color: rgb(50, 50, 50);
+}
