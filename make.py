@@ -296,13 +296,12 @@ class Operations:
         assert(sys.platform.startswith("darwin"))
         from cx_Freeze import setup, Executable
 
-        # Dependencies are automatically detected, but it might need fine tuning.
+        # build the updater
         build_exe_options = {
             'build_exe': UPDATER_DIST_DIR,
             'excludes': ["_ssl", "pydoc", "doctest", "test", "_hashlib", "_bz2", "_lzma", "zipfile", "gzip", "unicodedata", "logging"],
             'compressed': True
         }
-
         sys.argv = ["make.py", "build"]
         setup(
             name = UPDATER_NAME,
@@ -317,12 +316,11 @@ class Operations:
             ]
         )
 
-        # Dependencies are automatically detected, but it might need fine tuning.
+        # build the app
         build_exe_options = {
             'excludes': ["_ssl", "pydoc", "doctest", "test"],
             'compressed': True
         }
-
         sys.path.append("build/")
         sys.argv = ["make.py", "build", "bdist_mac"]
         setup(
@@ -352,37 +350,32 @@ class Operations:
         os.mkdir("build/TSMApplication.app/Contents/MacOS")
         os.rename("build/TSMApplication.app/Contents/app", "build/TSMApplication.app/Contents/MacOS/app")
         os.rename("build/updater", "build/TSMApplication.app/Contents/MacOS/updater")
+        os.system("install_name_tool -change /Library/Frameworks/Python.framework/Versions/3.4/Python " +
+                  "@executable_path/Python build/TSMApplication.app/Contents/MacOS/updater/TSMUpdater")
 
         import subprocess
         platform_path = "build/TSMApplication.app/Contents/MacOS/app/platforms"
         platform_libs = os.listdir(platform_path)
         app_path = "build/TSMApplication.app/Contents/MacOS/app"
-        for file_name in [f for f in os.listdir(platform_path) if os.path.isfile(os.path.join(platform_path, f))]:
-            file_path = os.path.join(platform_path, file_name)
-            p = subprocess.Popen(["otool", "-L", file_path], stdout=subprocess.PIPE)
-            references = p.stdout.readlines()[1:]
-            for reference in references:
-                reference = reference.decode().strip().split()[0]
-                if reference.startswith("@rpath"):
-                    lib = reference.split('/')[-1]
-                    if lib in platform_libs:
-                        new_path = "@executable_path/platforms/" + reference.split('/')[-1]
-                    else:
-                        new_path = "@executable_path/" + reference.split('/')[-1]
-                    os.system("install_name_tool -change {} {} {}".format(reference, new_path, file_path))
-        for file_name in [f for f in os.listdir(app_path) if os.path.isfile(os.path.join(app_path, f))]:
-            file_path = os.path.join(app_path, file_name)
-            p = subprocess.Popen(["otool", "-L", file_path], stdout=subprocess.PIPE)
-            references = p.stdout.readlines()[1:]
-            for reference in references:
-                reference = reference.decode().strip().split()[0]
-                if reference.startswith("@rpath"):
-                    lib = reference.split('/')[-1]
-                    if lib in platform_libs:
-                        new_path = "@executable_path/platforms/" + reference.split('/')[-1]
-                    else:
-                        new_path = "@executable_path/" + reference.split('/')[-1]
-                    os.system("install_name_tool -change {} {} {}".format(reference, new_path, file_path))
+        paths = [
+            "build/TSMApplication.app/Contents/MacOS/app",
+            "build/TSMApplication.app/Contents/MacOS/app/platforms",
+            "build/TSMApplication.app/Contents/MacOS/updater",
+        ]
+        for path in paths:
+            for file_name in [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]:
+                file_path = os.path.join(path, file_name)
+                p = subprocess.Popen(["otool", "-L", file_path], stdout=subprocess.PIPE)
+                references = p.stdout.readlines()[1:]
+                for reference in references:
+                    reference = reference.decode().strip().split()[0]
+                    if reference.startswith("@rpath"):
+                        lib = reference.split('/')[-1]
+                        if lib in platform_libs:
+                            new_path = "@executable_path/platforms/" + reference.split('/')[-1]
+                        else:
+                            new_path = "@executable_path/" + reference.split('/')[-1]
+                        os.system("install_name_tool -change {} {} {}".format(reference, new_path, file_path))
         Operations.buildDMG()
 
 

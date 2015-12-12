@@ -707,6 +707,12 @@ class MainThread(QThread):
                 # abort - we'll try again later
                 self._logger.error("App file download error: {}".format(str(e)))
                 return
+        # make sure the new app has +x
+        import stat
+        new_app_path = os.path.abspath(os.path.join(os.path.dirname(sys.executable), os.pardir, Config.NEW_APP_PATH))
+        st = os.stat(new_app_path)
+        os.chmod(new_app_path, st.st_mode | stat.S_IEXEC)
+        # run the updater
         self.run_updater.emit()
         self.sleep(10)
         assert(False) # we should never get here!
