@@ -163,7 +163,7 @@ class WoWHelper(QObject):
             return self.INVALID_VERSION, 0, ""
         # get the version as a string
         version_str = None
-        with open(toc_path) as toc_file:
+        with open(toc_path, encoding='utf8') as toc_file:
             for line in toc_file:
                 if "## Version:" in line:
                     version_str = line[len("## Version:"):].strip()

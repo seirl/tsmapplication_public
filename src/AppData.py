@@ -22,7 +22,7 @@ class AppData:
         self._path = path
         self._info = []
         self._modified = False
-        with open(self._path) as app_data_file:
+        with open(self._path, encoding="utf8") as app_data_file:
             for line in app_data_file:
                 line = line.strip()
                 data = line[:line.rfind("--")-1]
@@ -63,6 +63,6 @@ class AppData:
     def save(self):
         if not self._modified:
             return
-        with open(self._path, 'w') as app_data_file:
+        with open(self._path, 'w', encoding="utf8") as app_data_file:
             for info in self._info:
                 app_data_file.write("{} --<{},{},{}>\n".format(info['data'], info['type'], info['realm'], info['time']))

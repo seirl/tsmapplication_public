@@ -330,7 +330,8 @@ class Operations:
             version = "1.0", # this version is meaningless for our purposes, but required
             options = {
                 'build_exe': build_exe_options,
-                'bdist_mac': {'bundle_name': APP_NAME, 'iconfile': os.path.join(RESOURCE_SRC_PATH, "logo.icns")},
+                'bdist_mac': {'bundle_name': APP_NAME, 'iconfile': os.path.join(RESOURCE_SRC_PATH, "logo.icns"),
+                              'qt_menu_nib': "/usr/local/Cellar/qt5/5.5.1_2/plugins/platforms"},
                 #'bdist_dmg': {'applications_shortcut': True, 'volume_label': "TSMApplication"}
             },
             executables = [
@@ -351,6 +352,37 @@ class Operations:
         os.mkdir("build/TSMApplication.app/Contents/MacOS")
         os.rename("build/TSMApplication.app/Contents/app", "build/TSMApplication.app/Contents/MacOS/app")
         os.rename("build/updater", "build/TSMApplication.app/Contents/MacOS/updater")
+
+        import subprocess
+        platform_path = "build/TSMApplication.app/Contents/MacOS/app/platforms"
+        platform_libs = os.listdir(platform_path)
+        app_path = "build/TSMApplication.app/Contents/MacOS/app"
+        for file_name in [f for f in os.listdir(platform_path) if os.path.isfile(os.path.join(platform_path, f))]:
+            file_path = os.path.join(platform_path, file_name)
+            p = subprocess.Popen(["otool", "-L", file_path], stdout=subprocess.PIPE)
+            references = p.stdout.readlines()[1:]
+            for reference in references:
+                reference = reference.decode().strip().split()[0]
+                if reference.startswith("@rpath"):
+                    lib = reference.split('/')[-1]
+                    if lib in platform_libs:
+                        new_path = "@executable_path/platforms/" + reference.split('/')[-1]
+                    else:
+                        new_path = "@executable_path/" + reference.split('/')[-1]
+                    os.system("install_name_tool -change {} {} {}".format(reference, new_path, file_path))
+        for file_name in [f for f in os.listdir(app_path) if os.path.isfile(os.path.join(app_path, f))]:
+            file_path = os.path.join(app_path, file_name)
+            p = subprocess.Popen(["otool", "-L", file_path], stdout=subprocess.PIPE)
+            references = p.stdout.readlines()[1:]
+            for reference in references:
+                reference = reference.decode().strip().split()[0]
+                if reference.startswith("@rpath"):
+                    lib = reference.split('/')[-1]
+                    if lib in platform_libs:
+                        new_path = "@executable_path/platforms/" + reference.split('/')[-1]
+                    else:
+                        new_path = "@executable_path/" + reference.split('/')[-1]
+                    os.system("install_name_tool -change {} {} {}".format(reference, new_path, file_path))
         Operations.buildDMG()
 
 
