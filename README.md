@@ -7,8 +7,8 @@ the TradeSkillMaster website and addons. If you are simply interested in using t
 ## Building
 
 The TSM App is written using the following software:
- - Python 3.4.3
- - PyQt 5.5.1
+* Python 3.4.3
+* PyQt 5.5.1
 
 In the root of the repository is a `make.py` script which implements a very basic build system. Simply running it without
 any arguments will build and run the application.
