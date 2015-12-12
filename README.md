@@ -7,6 +7,7 @@ the TradeSkillMaster website and addons. If you are simply interested in using t
 ## Building
 
 The TSM App is written using the following software:
+
 * Python 3.4.3
 * PyQt 5.5.1
 
