@@ -322,7 +322,9 @@ class WoWHelper(QObject):
 
             # do the backup
             assert(Config.BACKUP_NAME_SEPARATOR not in Config.BACKUP_TIME_FORMAT)
-            assert(Config.BACKUP_NAME_SEPARATOR not in account_name)
+            if Config.BACKUP_NAME_SEPARATOR in account_name:
+                # can't backup this account (TODO)
+                continue
             zip_name = "{}_{}.zip".format(account_name, datetime.now().strftime(Config.BACKUP_TIME_FORMAT))
             with ZipFile(os.path.join(backup_path, zip_name), 'w', ZIP_LZMA) as zip:
                 for sv_path in self._saved_variables_iterator(account_name):
