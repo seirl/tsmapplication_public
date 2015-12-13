@@ -135,11 +135,23 @@ class TSMApp(QObject):
         self.terms_accepted.emit()
 
 
-if __name__ == "__main__":
+def main():
     # Catch and log any exceptions that occur while running the app
     tsm_app = None
     try:
-        tsm_app = TSMApp()
+        try:
+            tsm_app = TSMApp()
+        except PermissionError as e:
+            # the app is already running
+            msg_box = QMessageBox()
+            msg_box.setWindowIcon(QIcon(":/resources/logo.png"))
+            msg_box.setWindowModality(Qt.ApplicationModal)
+            msg_box.setIcon(QMessageBox.Critical)
+            msg_box.setText("The TSM Application is already running!")
+            msg_box.setTextFormat(Qt.RichText)
+            msg_box.setStandardButtons(QMessageBox.Ok)
+            msg_box.exec_()
+            return
         tsm_app.run()
         # the user closed the app normally
         tsm_app._settings.close_reason = Config.CLOSE_REASON_NORMAL
@@ -150,3 +162,7 @@ if __name__ == "__main__":
         if tsm_app:
             tsm_app._settings.close_reason = Config.CLOSE_REASON_CRASH
         raise
+
+
+if __name__ == "__main__":
+    main()
