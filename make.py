@@ -409,6 +409,7 @@ class Operations:
         if os.spawnvp(os.P_WAIT, 'hdiutil', createargs) != 0:
             raise OSError('creation of the dmg failed')
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("operation", nargs="*", default=DEFAULT_OPERATIONS,

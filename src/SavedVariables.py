@@ -14,6 +14,7 @@
 # along with the TSM Desktop Application.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import logging
 import os
 from time import time
 
@@ -173,5 +174,9 @@ class SavedVariables:
         else:
             modified_time = int(os.path.getmtime(self._path))
             if modified_time > self._timestamp:
-                self._update_data()
+                try:
+                    self._update_data()
+                except AssertionError:
+                    logging.getLogger().error("Failed to parse file: {}".format(self._path))
+                    self._data = None
         return self._data
