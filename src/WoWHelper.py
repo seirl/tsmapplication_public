@@ -277,7 +277,8 @@ class WoWHelper(QObject):
 
 
     def _backup_file_iterator(self, target_account=None):
-        for file_path in os.listdir(self._get_backup_path()):
+        backup_path = self._get_backup_path()
+        for file_path in os.listdir(backup_path):
             file_name = os.path.basename(file_path)
             if file_name.endswith(".zip") and file_name.count(Config.BACKUP_NAME_SEPARATOR) == 1:
                 # this is probably a backup .zip
@@ -288,7 +289,7 @@ class WoWHelper(QObject):
                     timestamp = datetime.strptime(timestamp, Config.BACKUP_TIME_FORMAT)
                 except ValueError:
                     continue
-                yield account, timestamp, file_path
+                yield account, timestamp, os.path.join(backup_path, file_path)
 
 
     def _do_backup(self, account=None):
