@@ -111,16 +111,20 @@ class MainThread(QThread):
         if self._settings.version == 0:
             # this is the first time we've run r300 or higher
             old_login_settings = load_settings(Config.DEFAULT_OLD_LOGIN_SETTINGS, Config.ORG_NAME, "TSMAppLogin")
-            if old_login_settings.userId > 0:
-                # import the settings we care about from the old app
-                self._settings.email = old_login_settings.email
-                self._settings.password = str(old_login_settings.password, encoding="ascii")
-                self._settings.accepted_terms = (old_login_settings.touAccepted == "true")
-                # need to use QSettings directly for the regular settings since it uses groups / arrays
-                old_settings = QSettings(QSettings.IniFormat, QSettings.UserScope, Config.ORG_NAME, "TSMApplication")
-                self._settings.wow_path = old_settings.value("core/wowDirPath", Config.DEFAULT_SETTINGS['wow_path'])
-                self._settings.addon_beta = (WoWHelper().get_installed_version("TradeSkillMaster")[0] == WoWHelper.BETA_VERSION)
-                self._logger.info("Imported old settings!")
+            try:
+                if old_login_settings.userId > 0:
+                    # import the settings we care about from the old app
+                    self._settings.email = old_login_settings.email
+                    self._settings.password = str(old_login_settings.password, encoding="ascii")
+                    self._settings.accepted_terms = (old_login_settings.touAccepted == "true")
+                    # need to use QSettings directly for the regular settings since it uses groups / arrays
+                    old_settings = QSettings(QSettings.IniFormat, QSettings.UserScope, Config.ORG_NAME, "TSMApplication")
+                    self._settings.wow_path = old_settings.value("core/wowDirPath", Config.DEFAULT_SETTINGS['wow_path'])
+                    self._settings.addon_beta = (WoWHelper().get_installed_version("TradeSkillMaster")[0] == WoWHelper.BETA_VERSION)
+                    self._logger.info("Imported old settings!")
+            except Exception as e:
+                # just log it and move on
+                self._logger.warn("Error while importing old settings: {}".format(str(e)))
         self._settings.version = Config.SETTINGS_VERSION
         self._prev_close_reason = self._settings.close_reason
         self._settings.close_reason = Config.CLOSE_REASON_UNKNOWN
@@ -690,7 +694,10 @@ class MainThread(QThread):
         copy_file_list = []
         download_file_list = []
         if os.path.exists(app_new_path):
-            shutil.rmtree(app_new_path)
+            try:
+                shutil.rmtree(app_new_path)
+            except:
+                pass
         for file_info in new_app_files:
             file_path = file_info['path']
             dst_path = os.path.join(app_new_path, file_path)
