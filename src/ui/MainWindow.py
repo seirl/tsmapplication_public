@@ -138,7 +138,7 @@ class MainWindow(QMainWindow):
 
     def set_visible(self, visible):
         self.setVisible(visible)
-        if self._settings.start_minimized:
+        if self._settings.start_minimized and Config.IS_WINDOWS:
             self.showMinimized()
             self.setWindowState(Qt.WindowMinimized)
             logging.getLogger().info("Minimizing to the system tray")
