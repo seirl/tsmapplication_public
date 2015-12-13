@@ -140,9 +140,9 @@
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="tsm3_beta_checkbox">
+         <widget class="QCheckBox" name="addon_beta_checkbox">
           <property name="text">
-           <string>Download TSM3 Beta (requires invite or TSM Premium)</string>
+           <string>Download TSM Addon Beta (requires invite or TSM Premium)</string>
           </property>
          </widget>
         </item>

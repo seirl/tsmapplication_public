@@ -198,8 +198,18 @@ class WoWHelper(QObject):
     def delete_addon(self, addon):
         assert(addon)
         addon_dir = self._get_addon_path(addon)
-        if os.path.isdir(addon_dir):
-            rmtree(addon_dir)
+        # try deleting the addon directory 3 times
+        retries = 3
+        while True:
+            try:
+                if os.path.isdir(addon_dir):
+                    rmtree(addon_dir)
+                break
+            except OSError as e:
+                logging.getLogger().error("Failed to remove addon ({}, {}): {}".format(addon, retries, str(e)))
+                if retries == 0:
+                    raise
+                retries -= 1
 
 
     def install_addon(self, addon, zip):

@@ -123,15 +123,16 @@ class MainWindow(QMainWindow):
 
 
     def closeEvent(self, event):
-        msg_box = QMessageBox()
-        msg_box.setWindowIcon(QIcon(":/resources/logo.png"))
-        msg_box.setWindowModality(Qt.ApplicationModal)
-        msg_box.setIcon(QMessageBox.Information)
-        msg_box.setText("Are you sure you want to exit?")
-        msg_box.setStandardButtons(QMessageBox.Cancel | QMessageBox.Yes)
-        if msg_box.exec_() != QMessageBox.Yes:
-            event.ignore()
-            return
+        if self._settings.confirm_exit:
+            msg_box = QMessageBox()
+            msg_box.setWindowIcon(QIcon(":/resources/logo.png"))
+            msg_box.setWindowModality(Qt.ApplicationModal)
+            msg_box.setIcon(QMessageBox.Information)
+            msg_box.setText("Are you sure you want to exit?")
+            msg_box.setStandardButtons(QMessageBox.Cancel | QMessageBox.Yes)
+            if msg_box.exec_() != QMessageBox.Yes:
+                event.ignore()
+                return
         event.accept()
 
 

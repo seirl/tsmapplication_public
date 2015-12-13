@@ -96,7 +96,17 @@ class MainThread(QThread):
         QThread.__init__(self)
         self._logger = logging.getLogger()
 
-        # load settings
+        # load settings in temp variable first to migrate versions
+        temp_settings = QSettings()
+        settings_version = temp_settings.value("version", 0)
+        if settings_version == 300:
+            # upgrade from version 300 (some beta app users) to 1
+            temp_settings.setValue("addon_beta", temp_settings.value("tsm3_beta", False))
+            temp_settings.remove("tsm3_beta")
+            temp_settings.setValue("version", 1)
+        del temp_settings
+
+        # load settings for real
         self._settings = load_settings(Config.DEFAULT_SETTINGS)
         if self._settings.version == 0:
             # this is the first time we've run r300 or higher
@@ -109,9 +119,9 @@ class MainThread(QThread):
                 # need to use QSettings directly for the regular settings since it uses groups / arrays
                 old_settings = QSettings(QSettings.IniFormat, QSettings.UserScope, Config.ORG_NAME, "TSMApplication")
                 self._settings.wow_path = old_settings.value("core/wowDirPath", Config.DEFAULT_SETTINGS['wow_path'])
-                self._settings.tsm3_beta = (WoWHelper().get_installed_version("TradeSkillMaster")[0] == WoWHelper.BETA_VERSION)
+                self._settings.addon_beta = (WoWHelper().get_installed_version("TradeSkillMaster")[0] == WoWHelper.BETA_VERSION)
                 self._logger.info("Imported old settings!")
-        self._settings.version = Config.CURRENT_VERSION
+        self._settings.version = Config.SETTINGS_VERSION
         self._prev_close_reason = self._settings.close_reason
         self._settings.close_reason = Config.CLOSE_REASON_UNKNOWN
         self.update_run_at_startup()
@@ -249,7 +259,7 @@ class MainThread(QThread):
             sleep(1)
         for key, value in Config.DEFAULT_SETTINGS.items():
             setattr(self._settings, key, value)
-        self._settings.version = Config.CURRENT_VERSION
+        self._settings.version = Config.SETTINGS_VERSION
         self._wow_helper.set_wow_path("")
         self._set_fsm_state(self.State.LOGGED_OUT)
         self.set_login_window_form_values.emit("", "")
@@ -387,15 +397,18 @@ class MainThread(QThread):
         install_all = False
         download_notifications = []
         for addon in self._addon_versions:
-            latest_version = addon['betaVersion'] if self._settings.tsm3_beta else addon['version']
+            if addon['name'] == "TradeSkillMaster_ItemTracker":
+                addon['version'] = 0
+            beta_active = ('betaVersion' in addon) and self._settings.addon_beta
+            latest_version = addon['betaVersion'] if beta_active else addon['version']
             version_type, version_int, version_str = self._wow_helper.get_installed_version(addon['name'])
-            if self._settings.tsm3_beta and version_type == WoWHelper.RELEASE_VERSION:
+            if beta_active and version_type == WoWHelper.RELEASE_VERSION:
                 # upgrade to beta
                 version_int = 0
                 version_str = ""
                 install_all = True
-            elif not self._settings.tsm3_beta and version_type == WoWHelper.BETA_VERSION:
-                # downgrade to release
+            elif not beta_active and version_type == WoWHelper.BETA_VERSION:
+                # switch to release
                 version_int = 0
                 version_str = ""
                 install_all = True
@@ -407,9 +420,9 @@ class MainThread(QThread):
                 if latest_version == 0:
                     # remove this addon since it no longer exists
                     self._wow_helper.delete_addon(addon['name'])
-                elif version_int < latest_version and (self._api.get_is_premium() or self._settings.tsm3_beta):
+                elif version_int < latest_version and (self._api.get_is_premium() or beta_active or version_type == WoWHelper.BETA_VERSION):
                     # update this addon
-                    self._download_addon(addon['name'], "beta" if self._settings.tsm3_beta else "release")
+                    self._download_addon(addon['name'], "beta" if beta_active else "release")
                     if self._settings.addon_notification:
                         download_notifications.append("Downloaded {} {}".format(addon['name'], self._wow_helper.get_installed_version(addon['name'])[2]))
                     installed_addons.append(addon['name'])
@@ -532,21 +545,22 @@ class MainThread(QThread):
         addon_status = []
         for addon in self._addon_versions:
             name = addon['name']
-            latest_version = addon['betaVersion'] if self._settings.tsm3_beta else addon['version']
+            beta_active = ('betaVersion' in addon) and self._settings.addon_beta
+            latest_version = addon['betaVersion'] if beta_active else addon['version']
             version_type, version_int, version_str = self._wow_helper.get_installed_version(name)
             status = None
             if version_type == WoWHelper.INVALID_VERSION:
                 if latest_version == 0:
                     # this addon doesn't exist
                     continue
-                status = {'text': "Not installed (double-click to install)", 'click_key':"addon~{}~{}".format(name, "beta" if self._settings.tsm3_beta else "release")}
+                status = {'text': "Not installed (double-click to install)", 'click_key':"addon~{}~{}".format(name, "beta" if beta_active else "release")}
             elif version_type in [WoWHelper.RELEASE_VERSION, WoWHelper.BETA_VERSION]:
                 if latest_version == 0:
                     # this addon no longer exists, so it will be uninstalled
                     status = {'text': "Removing..."}
                 elif version_int < latest_version:
                     # this addon needs to be updated
-                    if self._api.get_is_premium() or self._settings.tsm3_beta:
+                    if self._api.get_is_premium() or beta_active:
                         # defer the auto-updating until after we set the status
                         status = {'text': "Updating..."}
                     else:
