@@ -217,7 +217,7 @@ class MainThread(QThread):
                         msg_box.setStandardButtons(QMessageBox.Ok)
                         msg_box.exec_()
                         return
-                except psutil.AccessDenied:
+                except:
                     pass
             success = self._wow_helper.restore_backup(*parts)
             msg_box = QMessageBox()
