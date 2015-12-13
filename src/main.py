@@ -83,7 +83,7 @@ class TSMApp(QObject):
         self._main_window.settings_button_clicked.connect(self._settings_window.show)
         self._main_window.status_table_clicked.connect(self._main_thread.status_table_clicked, Qt.QueuedConnection)
         self._main_window.export_accounting.connect(self._main_thread.accounting_export)
-        self._main_thread.set_main_window_visible.connect(self._main_window.setVisible)
+        self._main_thread.set_main_window_visible.connect(self._main_window.set_visible)
         self._main_thread.set_main_window_header_text.connect(self._main_window._ui.header_text.setText)
         self._main_thread.set_main_window_sync_status_data.connect(self._main_window.set_sync_status_data)
         self._main_thread.set_main_window_addon_status_data.connect(self._main_window.set_addon_status_data)
@@ -114,6 +114,7 @@ class TSMApp(QObject):
     def run_updater(self):
         self._settings.close_reason = Config.CLOSE_REASON_UPDATE
         self._logger.warn("Running updater!")
+        del self._main_window
         sys.argv[0] = os.path.abspath(os.path.join(os.path.dirname(sys.executable), os.pardir, Config.UPDATER_PATH))
         os.execl(sys.argv[0], *sys.argv)
 
