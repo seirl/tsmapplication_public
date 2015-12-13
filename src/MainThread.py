@@ -397,8 +397,6 @@ class MainThread(QThread):
         install_all = False
         download_notifications = []
         for addon in self._addon_versions:
-            if addon['name'] == "TradeSkillMaster_ItemTracker":
-                addon['version'] = 0
             beta_active = ('betaVersion' in addon) and self._settings.addon_beta
             latest_version = addon['betaVersion'] if beta_active else addon['version']
             version_type, version_int, version_str = self._wow_helper.get_installed_version(addon['name'])
