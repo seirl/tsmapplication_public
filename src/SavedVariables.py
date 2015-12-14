@@ -176,7 +176,7 @@ class SavedVariables:
             if modified_time > self._timestamp:
                 try:
                     self._update_data()
-                except AssertionError:
+                except:
                     logging.getLogger().error("Failed to parse file: {}".format(self._path))
                     self._data = None
         return self._data
