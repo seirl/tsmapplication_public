@@ -26,7 +26,10 @@ class AppData:
             for line in app_data_file:
                 line = line.strip()
                 data = line[:line.rfind("--")-1]
-                type, realm, time = line[line.rfind("--")+3:-1].split(",")
+                try:
+                    type, realm, time = line[line.rfind("--")+3:-1].split(",")
+                except ValueError:
+                    continue
                 if type in self.TYPES:
                     self._info.append({'data': data, 'type': type, 'realm': realm, 'time': int(time)})
 
