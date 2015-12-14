@@ -403,6 +403,8 @@ class WoWHelper(QObject):
             if not region:
                 continue
             data = self._get_saved_variables(account, "TradeSkillMaster_Accounting")
+            if '_scopeKeys' not in data or 'realm' not in data['_scopeKeys']:
+                continue
             for realm in data['_scopeKeys']['realm'].values():
                 def parse_data_helper(key):
                     if key not in data:

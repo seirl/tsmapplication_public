@@ -126,6 +126,8 @@ class AppAPI:
                     return data
         except Exception as e:
             # the request failed (weren't able to connect to the server)
+            if isinstance(e, ApiError) or isinstance(e, ApiTransientError):
+                raise
             if isinstance(e, HTTPError):
                 logger.error("Got HTTP status code of {} ({})".format(e.code, e.reason))
             elif isinstance(e, URLError):
