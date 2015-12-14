@@ -193,7 +193,7 @@ class AppAPI:
         return self._make_request(alt_url=url)
 
 
-    def log(self, data, is_crash):
+    def log(self, data, is_crash=False):
         self._make_request("log", "crash" if is_crash else "user", data=data)
 
 
