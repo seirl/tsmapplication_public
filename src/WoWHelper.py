@@ -60,10 +60,13 @@ class WoWHelper(QObject):
 
 
     def _get_addon_path(self, addon=None):
+        addons_path = os.path.join(self._settings.wow_path, "Interface", "Addons")
+        if not os.path.isdir(addons_path):
+            addons_path = os.path.join(self._settings.wow_path, "Interface", "AddOns")
         if addon:
-            return os.path.abspath(os.path.join(self._settings.wow_path, "Interface", "Addons", addon))
+            return os.path.abspath(os.path.join(addons_path, addon))
         else:
-            return os.path.abspath(os.path.join(self._settings.wow_path, "Interface", "Addons"))
+            return os.path.abspath(addons_path)
 
 
     def _get_saved_variables_path(self, account, addon=None):
