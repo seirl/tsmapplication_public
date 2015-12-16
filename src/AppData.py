@@ -22,16 +22,19 @@ class AppData:
         self._path = path
         self._info = []
         self._modified = False
-        with open(self._path, encoding="utf8") as app_data_file:
-            for line in app_data_file:
-                line = line.strip()
-                data = line[:line.rfind("--")-1]
-                try:
-                    type, realm, time = line[line.rfind("--")+3:-1].split(",")
-                except ValueError:
-                    continue
-                if type in self.TYPES:
-                    self._info.append({'data': data, 'type': type, 'realm': realm, 'time': int(time)})
+        try:
+            with open(self._path, encoding="utf8") as app_data_file:
+                for line in app_data_file:
+                    line = line.strip()
+                    data = line[:line.rfind("--")-1]
+                    try:
+                        type, realm, time = line[line.rfind("--")+3:-1].split(",")
+                    except ValueError:
+                        continue
+                    if type in self.TYPES:
+                        self._info.append({'data': data, 'type': type, 'realm': realm, 'time': int(time)})
+        except:
+            pass
 
 
     def _get_info(self, type, realm):
