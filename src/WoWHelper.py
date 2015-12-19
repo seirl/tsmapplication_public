@@ -135,7 +135,7 @@ class WoWHelper(QObject):
 
     def set_wow_path(self, path):
         # We'll validate the WoW folder by checking for Interface/Addons and WTF folders
-        if not os.path.isdir(os.path.abspath(os.path.join(path, "Interface", "Addons"))) or not os.path.isdir(os.path.abspath(os.path.join(path, "WTF"))):
+        if not (os.path.isdir(os.path.abspath(os.path.join(path, "Interface", "Addons"))) or os.path.isdir(os.path.abspath(os.path.join(path, "Interface", "AddOns")))) or not os.path.isdir(os.path.abspath(os.path.join(path, "WTF"))):
             if self._settings.wow_path != "":
                 self._watcher.removePath(self._get_addon_path())
             self._settings.wow_path = ""
