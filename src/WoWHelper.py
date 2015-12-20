@@ -166,7 +166,7 @@ class WoWHelper(QObject):
             return self.INVALID_VERSION, 0, ""
         # get the version as a string
         version_str = None
-        with open(toc_path, encoding='utf8') as toc_file:
+        with open(toc_path, encoding="utf8", errors="replace") as toc_file:
             for line in toc_file:
                 if "## Version:" in line:
                     version_str = line[len("## Version:"):].strip()
@@ -262,7 +262,7 @@ class WoWHelper(QObject):
             logging.getLogger().error("Failed to export accounting data ({}, {}, {})".format(account, realm, key))
             return
         data = data.replace("\\n", "\n")
-        with open(path, 'w', encoding="utf8") as f:
+        with open(path, 'w', encoding="utf8", errors="replace") as f:
             f.write(data)
         logging.getLogger().info("Exported accounting data to {}".format(path))
 

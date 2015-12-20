@@ -93,7 +93,7 @@ class SavedVariables:
         self._data = None
         if not os.path.isfile(self._path):
             return
-        with open(self._path, encoding="utf8") as f:
+        with open(self._path, encoding="utf8", errors="replace") as f:
             data = f.read()
         if not data:
             return
