@@ -27,7 +27,7 @@ assert(IS_WINDOWS != IS_MAC) # only one should be set
 # General app constants
 ORG_NAME = "TradeSkillMaster"
 APP_NAME = "TSMApplication"
-CURRENT_VERSION = 301
+CURRENT_VERSION = 302
 LOG_FILE_PATH = None
 STATUS_CHECK_INTERVAL_S = 10 * 60
 APP_API_BASE_URL = "http://app-server.tradeskillmaster.com/v1"
