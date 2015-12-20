@@ -604,7 +604,7 @@ class MainThread(QThread):
                 wowuction_status = {'text': "Up to date"}
             if info['shopping'] == 0:
                 # they aren't premium so don't get shopping data
-                shopping_status = {'text': "N/A"} if realm_name == "Global" else {'text': "Go premium to enabled"}
+                shopping_status = {'text': "N/A"} if realm_name == "Global" else {'text': "Go premium to enable"}
             elif info['shopping'] > app_data.last_update("SHOPPING_SEARCHES", realm_name):
                 # an update is pending
                 shopping_status = {'text': "Updating..."}
