@@ -141,9 +141,12 @@ class MainWindow(QMainWindow):
         if self._settings.start_minimized and Config.IS_WINDOWS:
             self.showMinimized()
             self.setWindowState(Qt.WindowMinimized)
-            logging.getLogger().info("Minimizing to the system tray")
-            self._tray_icon.show()
-            self.hide()
+            if self._settings.minimize_to_tray:
+                logging.getLogger().info("Minimizing to the system tray")
+                self._tray_icon.show()
+                self.hide()
+            else:
+                logging.getLogger().info("Minimizing")
 
 
     def _restore_from_tray(self):
