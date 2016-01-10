@@ -49,8 +49,9 @@ class TSMApp(QObject):
         # initialize the logger
         logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s", datefmt="%m/%d/%Y %H:%M:%S")
         self._logger = logging.getLogger()
-        # remove default (stdout) handler
-        self._logger.handlers = []
+        if getattr(sys, 'frozen', False):
+            # remove default (stdout) handler
+            self._logger.handlers = []
         self._logger.setLevel(logging.DEBUG)
         app_data_dir = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
         os.makedirs(app_data_dir, exist_ok=True)

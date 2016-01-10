@@ -384,10 +384,7 @@ class MainThread(QThread):
 
         self.set_main_window_title.emit("TradeSkillMaster Application r{} - {}".format(Config.CURRENT_VERSION, self._api.get_username()))
         app_info = result['appInfo']
-        if app_info['version'] > Config.CURRENT_VERSION:
-            # we should have already updated - abort and wait to try again
-            return
-        elif app_info['news'] != self._last_news:
+        if app_info['news'] != self._last_news:
             # show news
             self.show_desktop_notification.emit(app_info['news'], False)
             self._last_news = app_info['news']
