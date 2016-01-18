@@ -444,16 +444,15 @@ class MainThread(QThread):
         # update addon status again incase we changed something (i.e. downloaded updates or deleted an old addon)
         self._update_addon_status()
 
-        # check realm data (AuctionDB / Shopping / WoWuction) status
+        # check realm data (AuctionDB / Shopping) status
         app_data = self._wow_helper.get_app_data()
         if not app_data:
             # TSM_AppHelper is not installed
             self.show_desktop_notification.emit("You need to install the TradeSkillMaster_AppHelper addon!", True)
             self.set_main_window_header_text.emit("<font color='red'>You need to install <a href=\"http://www.curse.com/addons/wow/tradeskillmaster_apphelper\">TradeSkillMaster_AppHelper</a>!</font>")
             return
-        auctiondb_updates = []
-        shopping_updates = []
-        wowuction_updates = []
+        auctiondb_updates = {}
+        shopping_updates = {}
         self._data_sync_status = {}
         if len(result['realms']) == 0:
             # No realms setup so no point in going further
@@ -462,77 +461,80 @@ class MainThread(QThread):
             return
         for info in result['realms']:
             self._data_sync_status[info['name']] = {
+                'type': "realm",
                 'id': info['id'],
-                'auctiondb': info['lastModified'] if info['auctiondb'] else 0,
-                'shopping': info['lastModified'] if info['name'] != "Global" and self._api.get_is_premium() else 0,
-                'wowuction': result['wowuction']['lastModified'] if info['wowuction'] else 0,
+                'masterId': info['masterId'],
+                'auctiondb': info['lastModified'] if info['auctiondb'] else -1,
+                'shopping': info['lastModified'] if self._api.get_is_premium() else -1,
+            }
+        for info in result['regions']:
+            self._data_sync_status[info['name']] = {
+                'type': "region",
+                'id': info['id'],
+                'auctiondb': info['lastModified']
             }
         self._update_data_sync_status()
         for realm_name, info in self._data_sync_status.items():
-            if info['auctiondb'] > app_data.last_update("AUCTIONDB_MARKET_DATA", realm_name):
-                auctiondb_updates.append(info['id'])
-            if info['shopping'] > app_data.last_update("SHOPPING_SEARCHES", realm_name):
-                shopping_updates.append(info['id'])
-            if info['wowuction'] > app_data.last_update("WOWUCTION_MARKET_DATA", realm_name):
-                wowuction_updates.append(info['id'])
+            if info['type'] == "realm":
+                if info['auctiondb'] > app_data.last_update("AUCTIONDB_REALM_DATA", realm_name):
+                    key = (info['type'], info['masterId'])
+                    if key not in auctiondb_updates:
+                        auctiondb_updates[key] = []
+                    auctiondb_updates[key].append(info['id'])
+                if info['shopping'] > app_data.last_update("SHOPPING_SEARCHES", realm_name):
+                    if info['masterId'] not in shopping_updates:
+                        shopping_updates[info['masterId']] = []
+                    shopping_updates[info['masterId']].append(info['id'])
+            elif info['type'] == "region":
+                if info['auctiondb'] > app_data.last_update("AUCTIONDB_REGION_DATA", realm_name):
+                    key = (info['type'], info['id'])
+                    auctiondb_updates[key] = []
+            else:
+                raise Exception("Invalid type {}".format(info['type']))
 
         hit_error = False
-        if auctiondb_updates:
-            # get auctiondb updates (all at once)
+
+        # get auctiondb updates
+        updated_realms = []
+        for key, realms in auctiondb_updates.items():
+            type, id = key
             try:
-                updated_realms = []
-                for auctiondb_data in self._api.auctiondb(auctiondb_updates)['data']:
-                    for realm_id in auctiondb_data['realms']:
+                data = self._api.auctiondb(type, str(id))['data']
+                if type == "realm":
+                    for realm_id in realms:
                         realm_name, last_modified = next((x['name'], x['lastModified']) for x in result['realms'] if x['id'] == realm_id)
-                        app_data.update("AUCTIONDB_MARKET_DATA", realm_name, auctiondb_data['data'], last_modified)
+                        app_data.update("AUCTIONDB_REALM_DATA", realm_name, data, last_modified)
                         updated_realms.append(realm_name)
-                if self._settings.realm_data_notification:
-                    self.show_desktop_notification.emit("Updated AuctionDB data for {}".format(" / ".join(updated_realms)), False)
+                elif type == "region":
+                    region_name, last_modified = next((x['name'], x['lastModified']) for x in result['regions'] if x['id'] == id)
+                    app_data.update("AUCTIONDB_REGION_DATA", region_name, data, last_modified)
+                    updated_realms.append(region_name)
+                else:
+                    raise Exception("Invalid type {}".format(type))
             except (ApiError, ApiTransientError) as e:
                 # log an error and keep going
                 self._logger.error("Got error from AuctionDB API: {}".format(str(e)))
                 hit_error = True
-        if shopping_updates:
-            # get shopping updates (all at once)
+        if not hit_error and self._settings.realm_data_notification:
+            self.show_desktop_notification.emit("Updated AuctionDB data for {}".format(" / ".join(updated_realms)), False)
+
+        # get shopping updates
+        updated_realms = []
+        for id, realms in shopping_updates.items():
             try:
-                updated_realms = []
-                for shopping_data in self._api.shopping(shopping_updates)['data']:
-                    for realm_id in shopping_data['realms']:
-                        realm_name, last_modified = next((x['name'], x['lastModified']) for x in result['realms'] if x['id'] == realm_id)
-                        app_data.update("SHOPPING_SEARCHES", realm_name, shopping_data['data'], last_modified, True)
-                        updated_realms.append(realm_name)
-                if self._settings.realm_data_notification and updated_realms:
-                    self.show_desktop_notification.emit("Updated Great Deals for {}".format(" / ".join(updated_realms)), False)
+                shopping_data = self._api.shopping(str(id))['data']
+                for realm_id in realms:
+                    realm_name, last_modified = next((x['name'], x['lastModified']) for x in result['realms'] if x['id'] == realm_id)
+                    app_data.update("SHOPPING_SEARCHES", realm_name, shopping_data, last_modified)
+                    updated_realms.append(realm_name)
             except (ApiError, ApiTransientError) as e:
                 # log an error and keep going
                 self._logger.error("Got error from Shopping API: {}".format(str(e)))
                 hit_error = True
-        if wowuction_updates:
-            # get wowuction updates
-            try:
-                updated_realms = []
-                for realm_id in wowuction_updates:
-                    realm_name, realm_slug = next((x['name'], x['slug']) for x in result['realms'] if x['id'] == realm_id)
-                    last_modified = result['wowuction']['lastModified']
-                    if realm_name == "Global":
-                        raw_data = self._api.wowuction()
-                        data = raw_data['regionData']
-                    else:
-                        raw_data = self._api.wowuction(realm_slug)
-                        data = raw_data['realmData']
-                    fields = ["\"{}\"".format(x) for x in data['fields']]
-                    data = data['horde']
-                    # time for some beautiful python goodness...this basically just converts a python list of lists into a stringified lua list of lists
-                    data = "{{{}}}".format(",".join(["{{{}}}".format(",".join([str(x) for x in item])) for item in data]))
-                    processed_data = "{{downloadTime={},fields={{{}}},data={}}}".format(last_modified, ",".join(fields), data)
-                    app_data.update("WOWUCTION_MARKET_DATA", realm_name, processed_data, last_modified)
-                    updated_realms.append(realm_name)
-                if self._settings.realm_data_notification:
-                    self.show_desktop_notification.emit("Updated WoWuction data for {}".format(" / ".join(updated_realms)), False)
-            except (ApiError, ApiTransientError) as e:
-                # log an error and keep going
-                self._logger.error("Got error from WoWuction API: {}".format(str(e)))
-        app_data.update("APP_INFO", "Global", "{{version={}}}".format(Config.CURRENT_VERSION), int(time()))
+        if not hit_error and self._settings.realm_data_notification and updated_realms:
+            self.show_desktop_notification.emit("Updated Great Deals for {}".format(" / ".join(updated_realms)), False)
+
+        app_data.update("APP_INFO", "Global", "{{version={},lastSync={}}}".format(Config.CURRENT_VERSION, int(time())), int(time()))
         app_data.save()
         self._update_data_sync_status()
         if not hit_error:
@@ -583,31 +585,40 @@ class MainThread(QThread):
         # check data sync status versions
         sync_status = []
         for realm_name, info in self._data_sync_status.items():
-            if info['auctiondb'] == 0:
+            if info['type'] == "realm":
+                last_auctiondb_update = app_data.last_update("AUCTIONDB_REALM_DATA", realm_name)
+            elif info['type'] == "region":
+                last_auctiondb_update = app_data.last_update("AUCTIONDB_REGION_DATA", realm_name)
+            else:
+                raise Exception("Invalid type {}".format(info['type']))
+            if info['auctiondb'] == -1:
                 # they don't have AuctionDB data enabled for this realm
                 auctiondb_status = {'text': "Disabled"}
-            elif info['auctiondb'] > app_data.last_update("AUCTIONDB_MARKET_DATA", realm_name):
+                update_time_status = {'text': "-"}
+            elif info['auctiondb'] > last_auctiondb_update:
                 # an update is pending
                 auctiondb_status = {'text': "Updating..."}
+                if last_auctiondb_update > 0:
+                    update_time_status = {'text': QDateTime.fromMSecsSinceEpoch(last_auctiondb_update*1000).toString(Qt.SystemLocaleShortDate)}
+                else:
+                    update_time_status = {'text': "-"}
             else:
                 auctiondb_status = {'text': "Up to date"}
-            if info['wowuction'] == 0:
-                # they don't have WoWuction data enabled for this realm
-                wowuction_status = {'text': "Disabled"}
-            elif info['wowuction'] > app_data.last_update("WOWUCTION_MARKET_DATA", realm_name):
-                # an update is pending
-                wowuction_status = {'text': "Updating..."}
-            else:
-                wowuction_status = {'text': "Up to date"}
-            if info['shopping'] == 0:
+                if last_auctiondb_update > 0:
+                    update_time_status = {'text': QDateTime.fromMSecsSinceEpoch(last_auctiondb_update*1000).toString(Qt.SystemLocaleShortDate)}
+                else:
+                    update_time_status = {'text': "-"}
+            if 'shopping' not in info:
+                shopping_status = {'text': "N/A"}
+            elif info['shopping'] == -1:
                 # they aren't premium so don't get shopping data
-                shopping_status = {'text': "N/A"} if realm_name == "Global" else {'text': "Go premium to enable"}
+                shopping_status = {'text': "Go premium to enable"}
             elif info['shopping'] > app_data.last_update("SHOPPING_SEARCHES", realm_name):
                 # an update is pending
                 shopping_status = {'text': "Updating..."}
             else:
                 shopping_status = {'text': "Up to date"}
-            sync_status.append([{'text': realm_name}, auctiondb_status, wowuction_status, shopping_status])
+            sync_status.append([{'text': realm_name}, auctiondb_status, shopping_status, update_time_status])
         self.set_main_window_sync_status_data.emit(sync_status)
 
 

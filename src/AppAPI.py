@@ -39,7 +39,6 @@ _DEFAULT_USER_INFO = {
     'name': "",
     'isBeta': False,
     'isPremium': False,
-    'wowuction': None,
 }
 
 
@@ -102,15 +101,7 @@ class AppAPI:
                 if response.info().get("Content-Encoding") == "gzip":
                     with GzipFile(fileobj=BytesIO(raw_data), mode="rb") as f:
                         raw_data = f.read()
-                if alt_url and content_type == "text/plain":
-                    # wowuction doesn't set the content type header correctly
-                    raw_data = raw_data.decode(response.info().get_param("charset", "utf-8"))
-                    try:
-                        return json.loads(raw_data)
-                    except ValueError:
-                        # it was probably an error
-                        raise ApiTransientError()
-                elif content_type == "application/zip" or content_type == "application/octet-stream":
+                if content_type == "application/zip" or content_type == "application/octet-stream":
                     return raw_data
                 elif content_type == "application/json":
                     raw_data = raw_data.decode(response.info().get_param("charset", "utf-8"))
@@ -162,10 +153,6 @@ class AppAPI:
 
     def status(self):
         result = self._make_request("status")
-        self._user_info['wowuction'] = {}
-        self._user_info['wowuction']['region'] = result['wowuction']['region']
-        self._user_info['wowuction']['token'] = result['wowuction']['token']
-        self._user_info['wowuction']['tokenTime'] = result['wowuction']['tokenTime']
         return result
 
 
@@ -173,24 +160,12 @@ class AppAPI:
         return self._make_request("addon", name, version)
 
 
-    def auctiondb(self, realm_ids):
-        return self._make_request("auctiondb", "-".join([str(x) for x in realm_ids]))
+    def auctiondb(self, type, realm_id):
+        return self._make_request("auctiondb", type, realm_id)
 
 
-    def shopping(self, realm_ids):
-        return self._make_request("shopping", "-".join([str(x) for x in realm_ids]))
-
-
-    def wowuction(self, realm_slug=None):
-        if realm_slug:
-            # realm data
-            params = [self._user_info['wowuction']['region'], realm_slug, self._user_info['wowuction']['token'], self._user_info['wowuction']['tokenTime'], self._user_info['userId']]
-            url = "http://www.wowuction.com/{}/{}/horde/Tools/GetTSMDataStatic?token={}&app=tsm&version=4&realmdata=true&regiondata=false&time={}&tsmuserid={}".format(*params)
-        else:
-            # region data
-            params = [self._user_info['wowuction']['region'], self._user_info['wowuction']['token'], self._user_info['wowuction']['tokenTime'], self._user_info['userId']]
-            url = "http://www.wowuction.com/{}/aegwynn/horde/Tools/GetTSMDataStatic?token={}&app=tsm&version=4&realmdata=false&regiondata=true&time={}&tsmuserid={}".format(*params)
-        return self._make_request(alt_url=url)
+    def shopping(self, realm_id):
+        return self._make_request("shopping", realm_id)
 
 
     def log(self, data, is_crash=False):
