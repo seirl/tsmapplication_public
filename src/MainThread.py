@@ -22,8 +22,8 @@ from Settings import load_settings
 from WoWHelper import WoWHelper
 
 # PyQt5
-from PyQt5.QtCore import pyqtSignal, QDateTime, QMutex, QSettings, QThread, QVariant, QWaitCondition, Qt
-from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import pyqtSignal, QDateTime, QMutex, QSettings, QThread, QVariant, QWaitCondition, Qt, QUrl
+from PyQt5.QtGui import QDesktopServices, QIcon
 from PyQt5.QtWidgets import QMessageBox
 
 # General python modules
@@ -231,6 +231,12 @@ class MainThread(QThread):
             msg_box.setText("Restored backup successfully!" if success else "Failed to restore backup!")
             msg_box.setStandardButtons(QMessageBox.Ok)
             msg_box.exec_()
+        elif table == "changes":
+            addon = parts.pop(0)
+            if addon == "TradeSkillMaster":
+                QDesktopServices.openUrl(QUrl("http://www.curse.com/addons/wow/tradeskill-master#t1:changes"))
+            else:
+                QDesktopServices.openUrl(QUrl("http://www.curse.com/addons/wow/{}#t1:changes".format(addon)))
         else:
             raise Exception("Invalid table: {}".format(click_key))
 
@@ -476,7 +482,7 @@ class MainThread(QThread):
         self._update_data_sync_status()
         for realm_name, info in self._data_sync_status.items():
             if info['type'] == "realm":
-                if info['auctiondb'] > app_data.last_update("AUCTIONDB_REALM_DATA", realm_name):
+                if info['auctiondb'] > app_data.last_update("AUCTIONDB_MARKET_DATA", realm_name):
                     key = (info['type'], info['masterId'])
                     if key not in auctiondb_updates:
                         auctiondb_updates[key] = []
@@ -486,7 +492,7 @@ class MainThread(QThread):
                         shopping_updates[info['masterId']] = []
                     shopping_updates[info['masterId']].append(info['id'])
             elif info['type'] == "region":
-                if info['auctiondb'] > app_data.last_update("AUCTIONDB_REGION_DATA", realm_name):
+                if info['auctiondb'] > app_data.last_update("AUCTIONDB_MARKET_DATA", realm_name):
                     key = (info['type'], info['id'])
                     auctiondb_updates[key] = []
             else:
@@ -503,11 +509,11 @@ class MainThread(QThread):
                 if type == "realm":
                     for realm_id in realms:
                         realm_name, last_modified = next((x['name'], x['lastModified']) for x in result['realms'] if x['id'] == realm_id)
-                        app_data.update("AUCTIONDB_REALM_DATA", realm_name, data, last_modified)
+                        app_data.update("AUCTIONDB_MARKET_DATA", realm_name, data, last_modified)
                         updated_realms.append(realm_name)
                 elif type == "region":
                     region_name, last_modified = next((x['name'], x['lastModified']) for x in result['regions'] if x['id'] == id)
-                    app_data.update("AUCTIONDB_REGION_DATA", region_name, data, last_modified)
+                    app_data.update("AUCTIONDB_MARKET_DATA", region_name, data, last_modified)
                     updated_realms.append(region_name)
                 else:
                     raise Exception("Invalid type {}".format(type))
@@ -515,7 +521,7 @@ class MainThread(QThread):
                 # log an error and keep going
                 self._logger.error("Got error from AuctionDB API: {}".format(str(e)))
                 hit_error = True
-        if not hit_error and self._settings.realm_data_notification:
+        if not hit_error and self._settings.realm_data_notification and updated_realms:
             self.show_desktop_notification.emit("Updated AuctionDB data for {}".format(" / ".join(updated_realms)), False)
 
         # get shopping updates
@@ -554,7 +560,10 @@ class MainThread(QThread):
                 if latest_version == 0:
                     # this addon doesn't exist
                     continue
-                status = {'text': "Not installed (double-click to install)", 'click_key':"addon~{}~{}".format(name, "beta" if beta_active else "release")}
+                if self._api.get_is_premium() or beta_active:
+                    status = {'text': "Not installed (double-click to install)", 'click_key':"addon~{}~{}".format(name, "beta" if beta_active else "release")}
+                else:
+                    status = {'text': "Not installed"}
             elif version_type in [WoWHelper.RELEASE_VERSION, WoWHelper.BETA_VERSION]:
                 if latest_version == 0:
                     # this addon no longer exists, so it will be uninstalled
@@ -573,7 +582,7 @@ class MainThread(QThread):
             else:
                 raise Exception("Unexpected version type for {} ({}): {}".format(addon['name'], version_str, version_type))
             if status:
-                addon_status.append([{'text': name.replace("TradeSkillMaster_", "TSM_"), 'sort': name}, {'text': version_str}, status])
+                addon_status.append([{'text': name.replace("TradeSkillMaster_", "TSM_"), 'sort': name}, {'text': version_str, 'click_key':"changes~{}".format(name)}, status])
         self.set_main_window_addon_status_data.emit(addon_status)
 
 
@@ -585,12 +594,7 @@ class MainThread(QThread):
         # check data sync status versions
         sync_status = []
         for realm_name, info in self._data_sync_status.items():
-            if info['type'] == "realm":
-                last_auctiondb_update = app_data.last_update("AUCTIONDB_REALM_DATA", realm_name)
-            elif info['type'] == "region":
-                last_auctiondb_update = app_data.last_update("AUCTIONDB_REGION_DATA", realm_name)
-            else:
-                raise Exception("Invalid type {}".format(info['type']))
+            last_auctiondb_update = app_data.last_update("AUCTIONDB_MARKET_DATA", realm_name)
             if info['auctiondb'] == -1:
                 # they don't have AuctionDB data enabled for this realm
                 auctiondb_status = {'text': "Disabled"}
@@ -664,6 +668,8 @@ class MainThread(QThread):
             try:
                 if self._api.groups(account, profile, data, data['updateTime']):
                     self._logger.info("Uploaded group data ({}, {})!".format(account, profile))
+                else:
+                    self._logger.debug("Group data hasn't changed ({}, {})!".format(account, profile))
             except (ApiError, ApiTransientError) as e:
                 self._logger.error("Got error from group API: {}".format(str(e)))
 

@@ -15,7 +15,7 @@
 
 
 class AppData:
-    TYPES = ["AUCTIONDB_REALM_DATA", "AUCTIONDB_REGION_DATA", "SHOPPING_SEARCHES", "APP_INFO"]
+    TYPES = ["AUCTIONDB_MARKET_DATA", "SHOPPING_SEARCHES", "APP_INFO"]
 
 
     def __init__(self, path):
@@ -32,6 +32,9 @@ class AppData:
                     except ValueError:
                         continue
                     if type in self.TYPES:
+                        # remove old auctiondb global data
+                        if type == "AUCTIONDB_MARKET_DATA" and realm == "Global":
+                            continue
                         self._info.append({'data': data, 'type': type, 'realm': realm, 'time': int(time)})
         except:
             pass

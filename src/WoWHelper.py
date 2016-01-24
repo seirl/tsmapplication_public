@@ -409,41 +409,59 @@ class WoWHelper(QObject):
             if not data or '_scopeKeys' not in data or 'realm' not in data['_scopeKeys']:
                 continue
             for realm in data['_scopeKeys']['realm'].values():
-                def parse_data_helper(key):
+                def parse_data_helper(key, filter_by_source):
                     if key not in data:
                         return None
                     parsed_data = self._parse_csv(data[key])
                     if not parsed_data:
                         return None
-                    return [x for x in parsed_data if 'source' in x and x['source'] == "Auction"]
-                sales = parse_data_helper("r@{}@csvSales".format(realm))
-                buys = parse_data_helper("r@{}@csvBuys".format(realm))
+                    if filter_by_source:
+                        return [x for x in parsed_data if 'source' in x and x['source'] == "Auction"]
+                    else:
+                        return parsed_data
+                sales = parse_data_helper("r@{}@csvSales".format(realm), True)
+                buys = parse_data_helper("r@{}@csvBuys".format(realm), True)
+                expires = parse_data_helper("r@{}@csvExpired".format(realm), False)
+                cancels = parse_data_helper("r@{}@csvCancelled".format(realm), False)
                 def parse_save_time_helper(key):
                     if key not in data:
                         return None
                     return [int(x) for x in data[key].split(",") if x.isdigit()]
                 save_time_sales = parse_save_time_helper("r@{}@saveTimeSales".format(realm))
                 save_time_buys = parse_save_time_helper("r@{}@saveTimeBuys".format(realm))
+                save_time_expires = parse_save_time_helper("r@{}@saveTimeExpires".format(realm))
+                save_time_cancels = parse_save_time_helper("r@{}@saveTimeCancels".format(realm))
                 account_data = {'data': {}, 'updateTime': 0}
-                def process_data_iterator(data, save_times):
+                def process_data_iterator(data, save_times, has_price):
                     if not data or not save_times or len(data) != len(save_times):
                         return
                     for i, record in enumerate(data):
                         item_string_parts = record['itemString'].split(":")
                         if item_string_parts[0] == "i":
                             try:
-                                yield int(item_string_parts[1]), int(record['price']), int(record['stackSize']), int(record['quantity']), int(record['time']), int(save_times[i])
+                                price = int(record['price']) if has_price else 0
+                                yield int(item_string_parts[1]), price, int(record['stackSize']), int(record['quantity']), int(record['time']), int(save_times[i])
                             except ValueError:
                                 pass
-                for item_id, price, stack_size, quantity, sale_time, save_time in process_data_iterator(sales, save_time_sales):
+                for item_id, price, stack_size, quantity, sale_time, save_time in process_data_iterator(sales, save_time_sales, True):
                     if item_id not in account_data['data']:
                         account_data['data'][item_id] = []
                     account_data['data'][item_id].append([price, stack_size, quantity, sale_time, save_time, 2])
                     account_data['updateTime'] = max(account_data['updateTime'], save_time)
-                for item_id, price, stack_size, quantity, sale_time, save_time in process_data_iterator(buys, save_time_buys):
+                for item_id, price, stack_size, quantity, sale_time, save_time in process_data_iterator(buys, save_time_buys, True):
                     if item_id not in account_data['data']:
                         account_data['data'][item_id] = []
                     account_data['data'][item_id].append([price, stack_size, quantity, sale_time, save_time, 3])
+                    account_data['updateTime'] = max(account_data['updateTime'], save_time)
+                for item_id, price, stack_size, quantity, sale_time, save_time in process_data_iterator(expires, save_time_expires, False):
+                    if item_id not in account_data['data']:
+                        account_data['data'][item_id] = []
+                    account_data['data'][item_id].append([price, stack_size, quantity, sale_time, save_time, 4])
+                    account_data['updateTime'] = max(account_data['updateTime'], save_time)
+                for item_id, price, stack_size, quantity, sale_time, save_time in process_data_iterator(cancels, save_time_cancels, False):
+                    if item_id not in account_data['data']:
+                        account_data['data'][item_id] = []
+                    account_data['data'][item_id].append([price, stack_size, quantity, sale_time, save_time, 5])
                     account_data['updateTime'] = max(account_data['updateTime'], save_time)
                 if account_data:
                     result[(region, realm, account)] = account_data
