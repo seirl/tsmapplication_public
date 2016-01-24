@@ -62,6 +62,7 @@ DEFAULT_SETTINGS = {
     'realm_data_notification': True,
     'addon_notification': True,
     'backup_notification': True,
+    'news_notification': True,
     'close_reason': CLOSE_REASON_NORMAL,
 }
 DEFAULT_OLD_LOGIN_SETTINGS = {

@@ -392,7 +392,8 @@ class MainThread(QThread):
         app_info = result['appInfo']
         if app_info['news'] != self._last_news:
             # show news
-            self.show_desktop_notification.emit(app_info['news'], False)
+            if self._settings.news_notification:
+                self.show_desktop_notification.emit(app_info['news'], False)
             self._last_news = app_info['news']
 
         # update addon status

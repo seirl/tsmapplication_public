@@ -67,6 +67,7 @@ class SettingsWindow(QMainWindow):
             'realm_data_notification': self._ui.realm_data_notification_checkbox,
             'addon_notification': self._ui.addon_notification_checkbox,
             'backup_notification': self._ui.backup_notification_checkbox,
+            'news_notification': self._ui.news_notification_checkbox,
         }
         for setting_key, widget in self._settings_widgets.items():
             if isinstance(widget, QCheckBox):
