@@ -254,6 +254,7 @@ class WoWHelper(QObject):
             data = self._get_saved_variables(account, "TradeSkillMaster_Accounting")
             if not data:
                 return
+            item_names = data["g@ @itemStrings"]
             data = data["r@{}@{}".format(realm, DB_KEYS[key])]
         except KeyError as e:
             logging.getLogger().error("Failed to export accounting data ({}, {}, {}): {}".format(account, realm, key, str(e)))
@@ -261,9 +262,36 @@ class WoWHelper(QObject):
         if type(data) != str:
             logging.getLogger().error("Failed to export accounting data ({}, {}, {})".format(account, realm, key))
             return
-        data = data.replace("\\n", "\n")
+        keys, data = self._parse_csv(data)
+        item_lookup = {}
+        if 'itemString' in keys and 'itemName' not in keys:
+            keys.insert(1, "itemName")
+            for item_name, item_string in item_names.items():
+                item_lookup[item_string] = item_name.replace(',', '')
         with open(path, 'w', encoding="utf8", errors="replace") as f:
-            f.write(data)
+            try:
+                rows = [','.join(keys)]
+                for row in data:
+                    row_values = []
+                    for item_key in keys:
+                        if item_key == "itemName":
+                            if item_key in row and row[item_key] != "?":
+                                row_values += [row[item_key]]
+                            elif row['itemString'] in item_lookup:
+                                row_values += [item_lookup[row['itemString']]]
+                            else:
+                                row_values += ["?"]
+                        else:
+                            row_values += [row[item_key]]
+                    rows += [','.join(row_values)]
+                f.write('\n'.join(rows))
+            except KeyError as e:
+                logging.getLogger().error("Failed to export accounting data ({}, {}, {}): {}".format(account, realm, key, str(e)))
+                return
+
+        # data = data.replace("\\n", "\n")
+        # with open(path, 'w', encoding="utf8", errors="replace") as f:
+            # f.write(data)
         logging.getLogger().info("Exported accounting data to {}".format(path))
 
 
@@ -383,17 +411,17 @@ class WoWHelper(QObject):
         result = []
         rows = [x for x in csv.reader(data.split('\\n'), delimiter=',')]
         if len(rows) <= 1:
-            return None
+            return None, None
         keys = rows.pop(0)
         for row in rows:
             if len(row) != len(keys):
                 # invalid row
-                return None
+                return None, None
             result_row = {}
             for i, cell_value in enumerate(row):
                 result_row[keys[i]] = cell_value
             result.append(result_row)
-        return result
+        return keys, result
 
 
     def get_accounting_data(self):
@@ -412,7 +440,7 @@ class WoWHelper(QObject):
                 def parse_data_helper(key, filter_by_source):
                     if key not in data:
                         return None
-                    parsed_data = self._parse_csv(data[key])
+                    parsed_keys, parsed_data = self._parse_csv(data[key])
                     if not parsed_data:
                         return None
                     if filter_by_source:
