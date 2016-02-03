@@ -151,8 +151,8 @@ class AppAPI:
         return result
 
 
-    def addon(self, name, version):
-        return self._make_request("addon", name, version)
+    def addon(self, name):
+        return self._make_request("addon", name)
 
 
     def auctiondb(self, type, realm_id):

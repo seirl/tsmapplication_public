@@ -285,10 +285,10 @@ class MainThread(QThread):
         self._sleep_time = 0
 
 
-    def _download_addon(self, addon, version):
-        self._logger.info("Downloading {} version of {}".format(version, addon))
+    def _download_addon(self, addon):
+        self._logger.info("Downloading {}".format(addon))
         try:
-            with ZipFile(BytesIO(self._api.addon(addon, version))) as zip:
+            with ZipFile(BytesIO(self._api.addon(addon))) as zip:
                 self._wow_helper.install_addon(addon, zip)
         except (ApiTransientError, ApiError) as e:
             # either the user or we will try again later
@@ -422,7 +422,7 @@ class MainThread(QThread):
                     self._wow_helper.delete_addon(addon['name'])
                 elif version_int < latest_version and self._api.get_is_premium():
                     # update this addon
-                    self._download_addon(addon['name'], "release")
+                    self._download_addon(addon['name'])
                     if self._settings.addon_notification:
                         download_notifications.append("Downloaded {} {}".format(addon['name'], self._wow_helper.get_installed_version(addon['name'])[2]))
                     installed_addons.append(addon['name'])
@@ -547,7 +547,7 @@ class MainThread(QThread):
         addon_status = []
         for addon in self._addon_versions:
             name = addon['name']
-            latest_version = aaddon['version']
+            latest_version = addon['version']
             version_type, version_int, version_str = self._wow_helper.get_installed_version(name)
             status = None
             if version_type == WoWHelper.INVALID_VERSION:
@@ -555,7 +555,7 @@ class MainThread(QThread):
                     # this addon doesn't exist
                     continue
                 if self._api.get_is_premium():
-                    status = {'text': "Not installed (double-click to install)", 'click_key':"addon~{}~{}".format(name, "release")}
+                    status = {'text': "Not installed (double-click to install)", 'click_key':"addon~{}".format(name)}
                 else:
                     status = {'text': "Not installed"}
             elif version_type == WoWHelper.RELEASE_VERSION:

@@ -140,13 +140,6 @@
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="addon_beta_checkbox">
-          <property name="text">
-           <string>Download TSM Addon Beta (requires invite or TSM Premium)</string>
-          </property>
-         </widget>
-        </item>
-        <item>
          <spacer name="verticalSpacer">
           <property name="orientation">
            <enum>Qt::Vertical</enum>
