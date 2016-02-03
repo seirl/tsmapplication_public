@@ -392,18 +392,18 @@ class Operations:
             "build/TSMApplication.app", '-volname', "TSMApplication"
         ]
 
-        if True:
-            scriptargs = [
-                'osascript', '-e', 'tell application "Finder" to make alias \
-                file to POSIX file "/Applications" at POSIX file "%s"' %
-                os.path.realpath("build")
-            ]
+        # create Applications shortcut within the volumen
+        scriptargs = [
+            'osascript', '-e', 'tell application "Finder" to make alias \
+            file to POSIX file "/Applications" at POSIX file "%s"' %
+            os.path.realpath("build")
+        ]
 
-            if os.spawnvp(os.P_WAIT, 'osascript', scriptargs) != 0:
-                raise OSError('creation of Applications shortcut failed')
+        if os.spawnvp(os.P_WAIT, 'osascript', scriptargs) != 0:
+            raise OSError('creation of Applications shortcut failed')
 
-            createargs.append('-srcfolder')
-            createargs.append("build" + '/Applications')
+        createargs.append('-srcfolder')
+        createargs.append("build" + '/Applications')
 
         # Create the dmg
         if os.spawnvp(os.P_WAIT, 'hdiutil', createargs) != 0:

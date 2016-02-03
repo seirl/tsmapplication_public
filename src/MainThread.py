@@ -33,6 +33,7 @@ from io import BytesIO
 import logging
 import os
 import psutil
+from random import randint
 import re
 import shutil
 import sys
@@ -765,9 +766,9 @@ class MainThread(QThread):
             # get a new session by making a login request (which will move us to VALID_SESSION)
             if self._login_request():
                 # we failed to login, wait before trying again
-                self._sleep_time = Config.STATUS_CHECK_INTERVAL_S
+                self._sleep_time = randint(30, 90)
         elif self._state == self.State.VALID_SESSION:
-            self._sleep_time = Config.STATUS_CHECK_INTERVAL_S
+            self._sleep_time = Config.STATUS_CHECK_INTERVAL_S + randint(0, 90)
             self._update_app()
             if not self._wow_helper.has_valid_wow_path():
                 self.show_desktop_notification.emit("You need to select your WoW directory in the settings!", True)
