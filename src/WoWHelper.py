@@ -179,7 +179,7 @@ class WoWHelper(QObject):
             parts = version_str[1:].split(".")
             # check that the parts are all numeric
             if not all(x.isdigit() for x in parts):
-                logging.getLogger().error("Invalid version line for {}: {}".format(addon, line))
+                logging.getLogger().error("Invalid version line for {}: {}".format(addon, version_str))
                 return self.INVALID_VERSION, 0, ""
             if len(parts) == 2:
                 return self.RELEASE_VERSION, int(parts[0]) * 1000000 + int(parts[1]) * 10000, version_str
@@ -188,7 +188,7 @@ class WoWHelper(QObject):
             elif len(parts) == 4:
                 return self.RELEASE_VERSION, int(parts[0]) * 1000000 + int(parts[1]) * 10000 + int(parts[2]) * 100 + int(parts[3]), version_str
         else:
-            logging.getLogger().error("Invalid version line for {}: {}".format(addon, line))
+            logging.getLogger().error("Invalid version line for {}: {}".format(addon, version_str))
         return self.INVALID_VERSION, 0, ""
 
 
