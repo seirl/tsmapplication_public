@@ -63,7 +63,6 @@ class SettingsWindow(QMainWindow):
             'start_minimized': self._ui.start_minimized_checkbox,
             'minimize_to_tray': self._ui.minimize_to_tray_checkbox,
             'confirm_exit': self._ui.confirm_exit_checkbox,
-            'addon_beta': self._ui.addon_beta_checkbox,
             'realm_data_notification': self._ui.realm_data_notification_checkbox,
             'addon_notification': self._ui.addon_notification_checkbox,
             'backup_notification': self._ui.backup_notification_checkbox,
@@ -119,7 +118,6 @@ class SettingsWindow(QMainWindow):
         for setting_key, widget in self._settings_widgets.items():
             widget.setChecked(getattr(self._settings, setting_key))
         self._ui.wow_dir_editbox.setText(self._settings.wow_path)
-        self._ui.addon_beta_checkbox.setEnabled(self._settings.has_beta_access)
         self._ignore_changes = False
 
 
@@ -130,9 +128,7 @@ class SettingsWindow(QMainWindow):
         setting_key = self.sender().property("setting_key")
         setattr(self._settings, setting_key, checked == Qt.Checked)
         logging.getLogger().debug("Setting {} ({}, {})".format(str(setting_key), str(checked == Qt.Checked), getattr(self._settings, setting_key)))
-        if setting_key == "addon_beta":
-            self.settings_changed.emit(self._settings.wow_path)
-        elif setting_key == "run_at_startup":
+        if setting_key == "run_at_startup":
             self.run_at_startup_changed.emit()
 
 

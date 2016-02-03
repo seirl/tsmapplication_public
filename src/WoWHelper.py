@@ -35,8 +35,7 @@ from zipfile import ZipFile, ZIP_LZMA
 class WoWHelper(QObject):
     INVALID_VERSION = 0
     RELEASE_VERSION = 1
-    BETA_VERSION = 2
-    DEV_VERSION = 3
+    DEV_VERSION = 2
 
 
     addons_folder_changed = pyqtSignal()
@@ -175,13 +174,6 @@ class WoWHelper(QObject):
         elif version_str == "@project-version@":
             # this is a dev version
             return self.DEV_VERSION, -1, "Dev"
-        elif version_str[1] == "X":
-            # this is a beta version
-            parts = version_str.split("X")
-            if len(parts) != 2 or not all(x.isdigit() for x in parts):
-                logging.getLogger().error("Invalid version line for {}: {}".format(addon, line))
-                return self.INVALID_VERSION, 0, ""
-            return self.BETA_VERSION, int(parts[0]) * 1000 + int(parts[1]), version_str
         elif version_str[0] == "v":
             # this is a release version
             parts = version_str[1:].split(".")
@@ -190,9 +182,11 @@ class WoWHelper(QObject):
                 logging.getLogger().error("Invalid version line for {}: {}".format(addon, line))
                 return self.INVALID_VERSION, 0, ""
             if len(parts) == 2:
-                return self.RELEASE_VERSION, int(parts[0]) * 10000 + int(parts[1]) * 100, version_str
+                return self.RELEASE_VERSION, int(parts[0]) * 1000000 + int(parts[1]) * 10000, version_str
             elif len(parts) == 3:
-                return self.RELEASE_VERSION, int(parts[0]) * 10000 + int(parts[1]) * 100 + int(parts[2]), version_str
+                return self.RELEASE_VERSION, int(parts[0]) * 1000000 + int(parts[1]) * 10000 + int(parts[2]) * 100, version_str
+            elif len(parts) == 4:
+                return self.RELEASE_VERSION, int(parts[0]) * 1000000 + int(parts[1]) * 10000 + int(parts[2]) * 100 + int(parts[3]), version_str
         else:
             logging.getLogger().error("Invalid version line for {}: {}".format(addon, line))
         return self.INVALID_VERSION, 0, ""

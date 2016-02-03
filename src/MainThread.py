@@ -105,6 +105,12 @@ class MainThread(QThread):
             temp_settings.setValue("addon_beta", temp_settings.value("tsm3_beta", False))
             temp_settings.remove("tsm3_beta")
             temp_settings.setValue("version", 1)
+        settings_version = temp_settings.value("version", 0)
+        if settings_version == 1:
+            # removed beta settings with version 2
+            temp_settings.remove("addon_beta")
+            temp_settings.remove("has_beta_access")
+            temp_settings.setValue("version", 2)
         del temp_settings
 
         # load settings for real
@@ -121,7 +127,6 @@ class MainThread(QThread):
                     # need to use QSettings directly for the regular settings since it uses groups / arrays
                     old_settings = QSettings(QSettings.IniFormat, QSettings.UserScope, Config.ORG_NAME, "TSMApplication")
                     self._settings.wow_path = old_settings.value("core/wowDirPath", Config.DEFAULT_SETTINGS['wow_path'])
-                    self._settings.addon_beta = (WoWHelper().get_installed_version("TradeSkillMaster")[0] == WoWHelper.BETA_VERSION)
                     self._logger.info("Imported old settings!")
             except Exception as e:
                 # just log it and move on
@@ -321,7 +326,6 @@ class MainThread(QThread):
             pass
         elif new_state == self.State.VALID_SESSION:
             self.set_main_window_premium_button_visible.emit(not self._api.get_is_premium())
-            self._settings.has_beta_access = self._api.get_is_premium() or self._api.get_is_beta()
             self.settings_changed.emit()
             if old_state == self.State.LOGGED_OUT:
                 # we just logged in so clean up a few things
@@ -406,30 +410,19 @@ class MainThread(QThread):
         install_all = False
         download_notifications = []
         for addon in self._addon_versions:
-            beta_active = ('betaVersion' in addon) and self._settings.addon_beta
-            latest_version = addon['betaVersion'] if beta_active else addon['version']
+            latest_version = addon['version']
             version_type, version_int, version_str = self._wow_helper.get_installed_version(addon['name'])
-            if beta_active and version_type == WoWHelper.RELEASE_VERSION:
-                # upgrade to beta
-                version_int = 0
-                version_str = ""
-                install_all = True
-            elif not beta_active and version_type == WoWHelper.BETA_VERSION:
-                # switch to release
-                version_int = 0
-                version_str = ""
-                install_all = True
-            elif version_type == WoWHelper.INVALID_VERSION and install_all:
+            if version_type == WoWHelper.INVALID_VERSION and install_all:
                 # install all addons when upgrading / downgrading
                 version_int = 0
                 version_str = ""
-            if version_type in [WoWHelper.RELEASE_VERSION, WoWHelper.BETA_VERSION] or install_all:
+            if version_type == WoWHelper.RELEASE_VERSION or install_all:
                 if latest_version == 0:
                     # remove this addon since it no longer exists
                     self._wow_helper.delete_addon(addon['name'])
-                elif version_int < latest_version and (self._api.get_is_premium() or beta_active or version_type == WoWHelper.BETA_VERSION):
+                elif version_int < latest_version and self._api.get_is_premium():
                     # update this addon
-                    self._download_addon(addon['name'], "beta" if beta_active else "release")
+                    self._download_addon(addon['name'], "release")
                     if self._settings.addon_notification:
                         download_notifications.append("Downloaded {} {}".format(addon['name'], self._wow_helper.get_installed_version(addon['name'])[2]))
                     installed_addons.append(addon['name'])
@@ -554,25 +547,24 @@ class MainThread(QThread):
         addon_status = []
         for addon in self._addon_versions:
             name = addon['name']
-            beta_active = ('betaVersion' in addon) and self._settings.addon_beta
-            latest_version = addon['betaVersion'] if beta_active else addon['version']
+            latest_version = aaddon['version']
             version_type, version_int, version_str = self._wow_helper.get_installed_version(name)
             status = None
             if version_type == WoWHelper.INVALID_VERSION:
                 if latest_version == 0:
                     # this addon doesn't exist
                     continue
-                if self._api.get_is_premium() or beta_active:
-                    status = {'text': "Not installed (double-click to install)", 'click_key':"addon~{}~{}".format(name, "beta" if beta_active else "release")}
+                if self._api.get_is_premium():
+                    status = {'text': "Not installed (double-click to install)", 'click_key':"addon~{}~{}".format(name, "release")}
                 else:
                     status = {'text': "Not installed"}
-            elif version_type in [WoWHelper.RELEASE_VERSION, WoWHelper.BETA_VERSION]:
+            elif version_type == WoWHelper.RELEASE_VERSION:
                 if latest_version == 0:
                     # this addon no longer exists, so it will be uninstalled
                     status = {'text': "Removing..."}
                 elif version_int < latest_version:
                     # this addon needs to be updated
-                    if self._api.get_is_premium() or beta_active:
+                    if self._api.get_is_premium():
                         # defer the auto-updating until after we set the status
                         status = {'text': "Updating..."}
                     else:

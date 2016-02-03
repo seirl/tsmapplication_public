@@ -36,7 +36,7 @@ BACKUP_NAME_SEPARATOR = "_"
 MAX_BLACK_MARKET_AGE = 24 * 60 * 60
 UPDATER_PATH = os.path.join("updater", "TSMUpdater.exe") if IS_WINDOWS else os.path.join("updater", "TSMUpdater")
 NEW_APP_PATH = os.path.join("app_new", "TSMApplication.exe") if IS_WINDOWS else os.path.join("app_new", "TSMApplication")
-SETTINGS_VERSION = 1
+SETTINGS_VERSION = 2
 
 # close reasons
 CLOSE_REASON_NORMAL = 0
@@ -51,8 +51,6 @@ DEFAULT_SETTINGS = {
     'password': "",
     'accepted_terms': False,
     'wow_path': "",
-    'addon_beta': False,
-    'has_beta_access': False,
     'run_at_startup': True,
     'start_minimized': False,
     'minimize_to_tray': True,

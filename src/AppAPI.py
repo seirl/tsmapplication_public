@@ -37,7 +37,6 @@ _DEFAULT_USER_INFO = {
     'session': "",
     'userId': 0,
     'name': "",
-    'isBeta': False,
     'isPremium': False,
 }
 
@@ -130,10 +129,6 @@ class AppAPI:
 
     def get_username(self):
         return self._user_info['name']
-
-
-    def get_is_beta(self):
-        return self._user_info['isBeta']
 
 
     def get_is_premium(self):
