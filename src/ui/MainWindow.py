@@ -76,7 +76,7 @@ class MainWindow(QMainWindow):
         # stylesheet tweaks for things which don't work when put into the .css for some unknown reason
         self._ui.accounting_tab.setStyleSheet("QCheckBox:disabled { color : #666; } QCheckBox { color : white; }");
 
-        self._sync_status_table_model = TableModel(self, ['Realm', 'AuctionDB', 'Great Deals', 'Last Updated'])
+        self._sync_status_table_model = TableModel(self, ['Region/Realm', 'AuctionDB', 'Great Deals', 'Last Updated'])
         self._ui.sync_status_table.setModel(self._sync_status_table_model)
 
         self._addon_status_table_model = TableModel(self, ['Name', 'Version', 'Status'])

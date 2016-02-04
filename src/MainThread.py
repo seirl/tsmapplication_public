@@ -464,8 +464,9 @@ class MainThread(QThread):
             self._data_sync_status[info['name']] = {
                 'type': "realm",
                 'id': info['id'],
+                'region': info['region'],
                 'masterId': info['masterId'],
-                'auctiondb': info['lastModified'] if info['auctiondb'] else -1,
+                'auctiondb': info['lastModified'],
                 'shopping': info['lastModified'] if self._api.get_is_premium() else -1,
             }
         for info in result['regions']:
@@ -589,11 +590,7 @@ class MainThread(QThread):
         sync_status = []
         for realm_name, info in self._data_sync_status.items():
             last_auctiondb_update = app_data.last_update("AUCTIONDB_MARKET_DATA", realm_name)
-            if info['auctiondb'] == -1:
-                # they don't have AuctionDB data enabled for this realm
-                auctiondb_status = {'text': "Disabled"}
-                update_time_status = {'text': "-"}
-            elif info['auctiondb'] > last_auctiondb_update:
+            if info['auctiondb'] > last_auctiondb_update:
                 # an update is pending
                 auctiondb_status = {'text': "Updating..."}
                 if last_auctiondb_update > 0:
@@ -616,7 +613,8 @@ class MainThread(QThread):
                 shopping_status = {'text': "Updating..."}
             else:
                 shopping_status = {'text': "Up to date"}
-            sync_status.append([{'text': realm_name}, auctiondb_status, shopping_status, update_time_status])
+            name = "{}-{}".format(info['region'], realm_name) if info['type'] == "realm" else realm_name
+            sync_status.append([{'text': name}, auctiondb_status, shopping_status, update_time_status])
         self.set_main_window_sync_status_data.emit(sync_status)
 
 
