@@ -27,7 +27,7 @@ assert(IS_WINDOWS != IS_MAC) # only one should be set
 # General app constants
 ORG_NAME = "TradeSkillMaster"
 APP_NAME = "TSMApplication"
-CURRENT_VERSION = 303
+CURRENT_VERSION = 304
 LOG_FILE_PATH = None
 STATUS_CHECK_INTERVAL_S = 10 * 60
 APP_API_BASE_URL = "http://app-server.tradeskillmaster.com/v2"
@@ -62,6 +62,7 @@ DEFAULT_SETTINGS = {
     'backup_notification': True,
     'news_notification': True,
     'close_reason': CLOSE_REASON_NORMAL,
+    'system_id': "",
 }
 DEFAULT_OLD_LOGIN_SETTINGS = {
     'userId': 0,

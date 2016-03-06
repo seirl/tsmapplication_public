@@ -39,6 +39,7 @@ import shutil
 import sys
 from time import sleep, strftime, time
 import traceback
+import uuid
 from zipfile import ZipFile
 
 
@@ -135,6 +136,18 @@ class MainThread(QThread):
         self._prev_close_reason = self._settings.close_reason
         self._settings.close_reason = Config.CLOSE_REASON_UNKNOWN
         self.update_run_at_startup()
+
+        # set system ID if it's not already set
+        if not self._settings.system_id:
+            alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+            assert(len(alphabet) == 64)
+            mac = uuid.getnode()
+            assert(mac < 2 ** 48)
+            result = ""
+            for i in range(0, 8):
+                result += alphabet[mac % 64]
+                mac //= 64;
+            self._settings.system_id = result
 
         # initialize other helper classes
         self._api = AppAPI()
@@ -450,7 +463,7 @@ class MainThread(QThread):
         if not app_data:
             # TSM_AppHelper is not installed
             self.show_desktop_notification.emit("You need to install the TradeSkillMaster_AppHelper addon!", True)
-            self.set_main_window_header_text.emit("<font color='red'>You need to install <a href=\"http://www.curse.com/addons/wow/tradeskillmaster_apphelper\">TradeSkillMaster_AppHelper</a>!</font>")
+            self.set_main_window_header_text.emit("<font color='red'>You need to install <a href=\"http://www.curse.com/addons/wow/tradeskillmaster_apphelper\" style=\"color: #EC7800\">TradeSkillMaster_AppHelper</a>!</font>")
             return
         auctiondb_updates = {}
         shopping_updates = {}
@@ -458,7 +471,7 @@ class MainThread(QThread):
         if len(result['realms']) == 0:
             # No realms setup so no point in going further
             self.show_desktop_notification.emit("You have no realms setup!", True)
-            self.set_main_window_header_text.emit("<font color='red'>You have no <a href=\"https://tradeskillmaster.com/realms\">realms setup</a>!</font>")
+            self.set_main_window_header_text.emit("<font color='red'>You have no <a href=\"https://tradeskillmaster.com/realms\" style=\"color: #EC7800\">realms setup</a>!</font>")
             return
         for info in result['realms']:
             self._data_sync_status[info['name']] = {
@@ -536,7 +549,8 @@ class MainThread(QThread):
         if not hit_error and self._settings.realm_data_notification and updated_realms:
             self.show_desktop_notification.emit("Updated Great Deals for {}".format(" / ".join(updated_realms)), False)
 
-        app_data.update("APP_INFO", "Global", "{{version={},lastSync={}}}".format(Config.CURRENT_VERSION, int(time())), int(time()))
+        lua_versions = "{" + ",".join("{}={}".format(x['name'], x['version']) for x in self._addon_versions) + "}"
+        app_data.update("APP_INFO", "Global", "{{version={},lastSync={},addonVersions={}}}".format(Config.CURRENT_VERSION, int(time()), lua_versions), int(time()))
         app_data.save()
         self._update_data_sync_status()
         if not hit_error:
@@ -621,10 +635,11 @@ class MainThread(QThread):
     def _update_backup_status(self):
         backup_status = []
         for info in self._wow_helper.get_backups():
+            system_info = {'text': info['system_id'] + (" (local)" if info['system_id'] == self._settings.system_id else "")}
             time_info = {'text': info['timestamp'].strftime("%c"), 'sort': int(float(info['timestamp'].timestamp()))}
             assert("~" not in info['account'])
             notes_info = {'text': "Double-click to restore", 'click_key':"backup~{}~{}".format(info['account'], info['timestamp'].strftime(Config.BACKUP_TIME_FORMAT))}
-            backup_status.append([{'text': info['account']}, time_info, notes_info])
+            backup_status.append([system_info, {'text': info['account']}, time_info, notes_info])
         self.set_main_window_backup_status_data.emit(backup_status)
 
 

@@ -57,6 +57,17 @@ class WoWHelper(QObject):
             # try to automatically determine the wow path
             self.find_wow_path()
 
+        # add the system id to the backup zip names if necessary (r304 migration)
+        backup_path = self._get_backup_path()
+        to_move = {}
+        for file_path in os.listdir(backup_path):
+            file_name = os.path.basename(file_path)
+            if file_name.endswith(".zip") and file_name.count(Config.BACKUP_NAME_SEPARATOR) == 1:
+                new_file_name = self._settings.system_id + Config.BACKUP_NAME_SEPARATOR + file_name
+                to_move[os.path.join(backup_path, file_name)] = os.path.join(backup_path, new_file_name)
+        for src, dst in to_move.items():
+            os.rename(src, dst)
+
 
     def _get_addon_path(self, addon=None):
         addons_path = os.path.join(self._settings.wow_path, "Interface", "Addons")
@@ -301,20 +312,20 @@ class WoWHelper(QObject):
                 yield sv_path
 
 
-    def _backup_file_iterator(self, target_account=None):
+    def _backup_file_iterator(self, target_system_id=None, target_account=None):
         backup_path = self._get_backup_path()
         for file_path in os.listdir(backup_path):
             file_name = os.path.basename(file_path)
-            if file_name.endswith(".zip") and file_name.count(Config.BACKUP_NAME_SEPARATOR) == 1:
+            if file_name.endswith(".zip") and file_name.count(Config.BACKUP_NAME_SEPARATOR) == 2:
                 # this is probably a backup .zip
-                account, timestamp = file_name[:-4].split(Config.BACKUP_NAME_SEPARATOR)
-                if target_account and account != target_account:
+                system_id, account, timestamp = file_name[:-4].split(Config.BACKUP_NAME_SEPARATOR)
+                if (target_system_id and system_id != target_system_id) or (target_account and account != target_account):
                     continue
                 try:
                     timestamp = datetime.strptime(timestamp, Config.BACKUP_TIME_FORMAT)
                 except ValueError:
                     continue
-                yield account, timestamp, os.path.join(backup_path, file_path)
+                yield system_id, account, timestamp, os.path.join(backup_path, file_path)
 
 
     def _do_backup(self, account=None):
@@ -324,7 +335,7 @@ class WoWHelper(QObject):
         for account_name in accounts:
             # delete expired backups first so we'll do a new backup if the most recent one expired
             backup_times = []
-            for _, timestamp, path in self._backup_file_iterator(account_name):
+            for _, _, timestamp, path in self._backup_file_iterator(self._settings.system_id, account_name):
                 if (datetime.now() - timestamp) > timedelta(seconds=self._settings.backup_expire):
                     logging.getLogger().info("Purged old backup for account ({}): {}".format(account_name, path))
                     os.remove(path)
@@ -360,7 +371,8 @@ class WoWHelper(QObject):
 
 
     def get_backups(self):
-        return [{'account': account, 'timestamp':timestamp} for account, timestamp, _ in self._backup_file_iterator()]
+        return [{'system_id': system_id, 'account': account, 'timestamp': timestamp}
+                for system_id, account, timestamp, _ in self._backup_file_iterator()]
 
 
     def restore_backup(self, account, timestamp):

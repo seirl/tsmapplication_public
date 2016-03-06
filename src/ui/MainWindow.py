@@ -40,7 +40,7 @@ class MainWindow(QMainWindow):
         QMainWindow.__init__(self)
 
         self._settings = load_settings(Config.DEFAULT_SETTINGS)
-        
+
         # Init the processed .ui file
         self._ui = Ui_MainWindow()
         self._ui.setupUi(self)
@@ -82,9 +82,9 @@ class MainWindow(QMainWindow):
         self._addon_status_table_model = TableModel(self, ['Name', 'Version', 'Status'])
         self._ui.addon_status_table.setModel(self._addon_status_table_model)
 
-        self._backup_status_table_model = TableModel(self, ['Account', 'Timestamp', 'Notes'])
+        self._backup_status_table_model = TableModel(self, ['System ID', 'Account', 'Timestamp', 'Notes'])
         self._ui.backup_status_table.setModel(self._backup_status_table_model)
-        
+
         self._accounting_info = {}
         self._accounting_current_account = ""
         self._accounting_current_realm = ""
@@ -194,6 +194,12 @@ class MainWindow(QMainWindow):
 
 
     def set_backup_status_data(self, data):
+        system_text = "The system ID is unique to the computer you are running the desktop app from. " + \
+                      "<a href=\"http://tradeskillmaster.com/premium\" style=\"color: #EC7800\">Premium users</a> " + \
+                      "can sync backups to the cloud and across multiple computers. Otherwise, only backups from the " + \
+                      "local system (<font style=\"color: cyan\">{}</font>) will be listed below." \
+                      .format(self._settings.system_id)
+        self._ui.backup_system_text.setText(system_text)
         self._backup_status_table_model.set_info(data)
         self._ui.backup_status_table.resizeColumnsToContents()
         self._ui.backup_status_table.sortByColumn(1, Qt.DescendingOrder)
