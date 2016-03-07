@@ -427,7 +427,9 @@ class MainThread(QThread):
         if app_info['news'] != self._last_news:
             # show news
             if self._settings.news_notification:
-                self.show_desktop_notification.emit(app_info['news'], False)
+                # remove any HTML from the news
+                news = re.compile(r'<[^>]+>').sub('', app_info['news'])
+                self.show_desktop_notification.emit(news, False)
             self._last_news = app_info['news']
 
         # update addon status
@@ -581,11 +583,14 @@ class MainThread(QThread):
             self.show_desktop_notification.emit("Updated Great Deals for {}".format(" / ".join(updated_realms)), False)
 
         lua_versions = "{" + ",".join("{}={}".format(x['name'], x['version']) for x in self._addon_versions) + "}"
-        app_data.update("APP_INFO", "Global", "{{version={},lastSync={},addonVersions={}}}".format(Config.CURRENT_VERSION, int(time()), lua_versions), int(time()))
+        addon_message = "{{id={id},msg=\"{msg}\"}}".format(**result['addonMessage'])
+        app_data.update("APP_INFO", "Global", "{{version={},lastSync={},addonVersions={},message={}}}" \
+                        .format(Config.CURRENT_VERSION, int(time()), lua_versions, addon_message), \
+                        int(time()))
         app_data.save()
         self._update_data_sync_status()
         if not hit_error:
-            self.set_main_window_header_text.emit("{}\nEverything is up to date as of {}.".format(app_info['news'], QDateTime.currentDateTime().toString(Qt.SystemLocaleShortDate)))
+            self.set_main_window_header_text.emit("{}<br>Everything is up to date as of {}.".format(app_info['news'], QDateTime.currentDateTime().toString(Qt.SystemLocaleShortDate)))
 
 
     def _update_addon_status(self):
