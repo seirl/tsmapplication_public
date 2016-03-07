@@ -55,7 +55,7 @@ DEFAULT_SETTINGS = {
     'start_minimized': False,
     'minimize_to_tray': True,
     'confirm_exit': True,
-    'backup_period': 30 * 60,
+    'backup_period': 60 * 60,
     'backup_expire': 30 * 24 * 60 * 60,
     'realm_data_notification': True,
     'addon_notification': True,
