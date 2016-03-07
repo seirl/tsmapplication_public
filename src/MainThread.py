@@ -172,6 +172,8 @@ class MainThread(QThread):
         self._remote_backups = []
         self._last_news = ""
         self._is_logged_out = None
+        self._status_message = ""
+        self._status_message_strong = False
 
 
     def _wait_for_event(self, event):
@@ -414,8 +416,15 @@ class MainThread(QThread):
             if error_msg:
                 self.set_login_window_error_text.emit(error_msg)
 
+    def _set_main_window_status(self, message, is_strong=True):
+        if not is_strong and self._status_message_strong:
+            return
+        self._status_message_strong = is_strong
+        self._status_message = message
+        self.set_main_window_header_text.emit(message)
 
     def _check_status(self):
+        self._set_main_window_status("Connecting to server...", False)
         try:
             result = self._api.status()
         except (ApiError, ApiTransientError) as e:
@@ -437,6 +446,7 @@ class MainThread(QThread):
         self._update_addon_status()
 
         # download addon updates
+        self._set_main_window_status("One moment. Checking for addon updates...", False)
         installed_addons = []
         install_all = False
         download_notifications = []
@@ -467,12 +477,14 @@ class MainThread(QThread):
         else:
             for text in download_notifications:
                 self.show_desktop_notification.emit(text, False)
+        self._set_main_window_status("One moment. Backing up addon settings...", False)
         backed_up_accounts = self._wow_helper.set_addons_and_do_backups(installed_addons)
         if self._settings.backup_notification:
             for account in backed_up_accounts:
                 self.show_desktop_notification.emit("Created backup for {}".format(account), False)
         self._remote_backups = []
         if self._api.get_is_premium():
+            self._set_main_window_status("One moment. Uploading backups...", False)
             # get remote backups
             try:
                 remote_backup_names = self._api.backup()
@@ -496,7 +508,7 @@ class MainThread(QThread):
         if not app_data:
             # TSM_AppHelper is not installed
             self.show_desktop_notification.emit("You need to install the TradeSkillMaster_AppHelper addon!", True)
-            self.set_main_window_header_text.emit("<font color='red'>You need to install <a href=\"http://www.curse.com/addons/wow/tradeskillmaster_apphelper\" style=\"color: #EC7800\">TradeSkillMaster_AppHelper</a>!</font>")
+            self._set_main_window_status("<font color='red'>You need to install <a href=\"http://www.curse.com/addons/wow/tradeskillmaster_apphelper\" style=\"color: #EC7800\">TradeSkillMaster_AppHelper</a>!</font>")
             return
         auctiondb_updates = {}
         shopping_updates = {}
@@ -504,7 +516,7 @@ class MainThread(QThread):
         if len(result['realms']) == 0:
             # No realms setup so no point in going further
             self.show_desktop_notification.emit("You have no realms setup!", True)
-            self.set_main_window_header_text.emit("<font color='red'>You have no <a href=\"https://tradeskillmaster.com/realms\" style=\"color: #EC7800\">realms setup</a>!</font>")
+            self._set_main_window_status("<font color='red'>You have no <a href=\"https://tradeskillmaster.com/realms\" style=\"color: #EC7800\">realms setup</a>!</font>")
             return
         for info in result['realms']:
             self._data_sync_status[info['name']] = {
@@ -543,6 +555,7 @@ class MainThread(QThread):
         hit_error = False
 
         # get auctiondb updates
+        self._set_main_window_status("One moment. Downloading AuctionDB data...", False)
         updated_realms = []
         for key, realms in auctiondb_updates.items():
             type, id = key
@@ -567,6 +580,7 @@ class MainThread(QThread):
             self.show_desktop_notification.emit("Updated AuctionDB data for {}".format(" / ".join(updated_realms)), False)
 
         # get shopping updates
+        self._set_main_window_status("One moment. Downloading great deals data...", False)
         updated_realms = []
         for id, realms in shopping_updates.items():
             try:
@@ -589,8 +603,10 @@ class MainThread(QThread):
                         int(time()))
         app_data.save()
         self._update_data_sync_status()
-        if not hit_error:
-            self.set_main_window_header_text.emit("{}<br>Everything is up to date as of {}.".format(app_info['news'], QDateTime.currentDateTime().toString(Qt.SystemLocaleShortDate)))
+        if hit_error:
+            self._set_main_window_status("", False)
+        else:
+            self._set_main_window_status("{}<br>Everything is up to date as of {}.".format(app_info['news'], QDateTime.currentDateTime().toString(Qt.SystemLocaleShortDate)))
 
 
     def _update_addon_status(self):
@@ -812,7 +828,7 @@ class MainThread(QThread):
             self._update_app()
             if not self._wow_helper.has_valid_wow_path():
                 self.show_desktop_notification.emit("You need to select your WoW directory in the settings!", True)
-                self.set_main_window_header_text.emit("<font color='red'>You need to select your WoW directory in the settings!</font>")
+                self._set_main_window_status("<font color='red'>You need to select your WoW directory in the settings!</font>")
             else:
                 # make a status request
                 self._check_status()
