@@ -16,13 +16,14 @@
 
 # Local modules
 from AppAPI import AppAPI, ApiError, ApiTransientError
+from Backup import Backup
 import Config
 import PrivateConfig
 from Settings import load_settings
 from WoWHelper import WoWHelper
 
 # PyQt5
-from PyQt5.QtCore import pyqtSignal, QDateTime, QMutex, QSettings, QThread, QVariant, QWaitCondition, Qt, QUrl
+from PyQt5.QtCore import pyqtSignal, QDateTime, QMutex, QSettings, QStandardPaths, QThread, QVariant, QWaitCondition, Qt, QUrl
 from PyQt5.QtGui import QDesktopServices, QIcon
 from PyQt5.QtWidgets import QMessageBox
 
@@ -148,6 +149,9 @@ class MainThread(QThread):
                 result += alphabet[mac % 64]
                 mac //= 64;
             self._settings.system_id = result
+        if not self._settings.backup_path:
+            self._settings.backup_path = os.path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), "Backups")
+            os.makedirs(self._settings.backup_path, exist_ok=True)
 
         # initialize other helper classes
         self._api = AppAPI()
@@ -165,6 +169,7 @@ class MainThread(QThread):
         self._sleep_time = 0
         self._addon_versions = []
         self._data_sync_status = {}
+        self._remote_backups = []
         self._last_news = ""
         self._is_logged_out = None
 
@@ -242,14 +247,25 @@ class MainThread(QThread):
                         return
                 except:
                     pass
-            success = self._wow_helper.restore_backup(*parts)
-            msg_box = QMessageBox()
-            msg_box.setWindowIcon(QIcon(":/resources/logo.png"))
-            msg_box.setWindowModality(Qt.ApplicationModal)
-            msg_box.setIcon(QMessageBox.Information if success else QMessageBox.Warning)
-            msg_box.setText("Restored backup successfully!" if success else "Failed to restore backup!")
-            msg_box.setStandardButtons(QMessageBox.Ok)
-            msg_box.exec_()
+            backup = Backup(*parts)
+            if backup.is_remote():
+                # TODO - download the remote backup first
+                msg_box = QMessageBox()
+                msg_box.setWindowIcon(QIcon(":/resources/logo.png"))
+                msg_box.setWindowModality(Qt.ApplicationModal)
+                msg_box.setIcon(QMessageBox.Warning)
+                msg_box.setText("NOT YET IMPLEMENTED!")
+                msg_box.setStandardButtons(QMessageBox.Ok)
+                msg_box.exec_()
+            else:
+                success = self._wow_helper.restore_backup(backup)
+                msg_box = QMessageBox()
+                msg_box.setWindowIcon(QIcon(":/resources/logo.png"))
+                msg_box.setWindowModality(Qt.ApplicationModal)
+                msg_box.setIcon(QMessageBox.Information if success else QMessageBox.Warning)
+                msg_box.setText("Restored backup successfully!" if success else "Failed to restore backup!")
+                msg_box.setStandardButtons(QMessageBox.Ok)
+                msg_box.exec_()
         elif table == "changes":
             addon = parts.pop(0)
             if addon == "TradeSkillMaster":
@@ -453,6 +469,21 @@ class MainThread(QThread):
         if self._settings.backup_notification:
             for account in backed_up_accounts:
                 self.show_desktop_notification.emit("Created backup for {}".format(account), False)
+        self._remote_backups = []
+        if self._api.get_is_premium():
+            # get remote backups
+            try:
+                remote_backup_names = self._api.backup()
+                for remote_zip_name in remote_backup_names:
+                    self._remote_backups.append(Backup(remote_zip_name))
+                # upload backups if necessary
+                for backup in self._wow_helper.get_backups():
+                    if backup.get_remote_zip_name() not in remote_backup_names:
+                        backup_data = self._wow_helper.get_raw_backup_data(backup)
+                        if backup_data:
+                            self._api.backup(backup.get_remote_zip_name(), backup_data)
+            except (ApiError, ApiTransientError) as e:
+                self._logger.error("Got error from backup API: {}".format(str(e)))
         self._update_backup_status()
 
         # update addon status again incase we changed something (i.e. downloaded updates or deleted an old addon)
@@ -634,12 +665,11 @@ class MainThread(QThread):
 
     def _update_backup_status(self):
         backup_status = []
-        for info in self._wow_helper.get_backups():
-            system_info = {'text': info['system_id'] + (" (local)" if info['system_id'] == self._settings.system_id else "")}
-            time_info = {'text': info['timestamp'].strftime("%c"), 'sort': int(float(info['timestamp'].timestamp()))}
-            assert("~" not in info['account'])
-            notes_info = {'text': "Double-click to restore", 'click_key':"backup~{}~{}".format(info['account'], info['timestamp'].strftime(Config.BACKUP_TIME_FORMAT))}
-            backup_status.append([system_info, {'text': info['account']}, time_info, notes_info])
+        for backup in self._wow_helper.get_backups() + [x for x in self._remote_backups if x.system_id != self._settings.system_id]:
+            system_info = {'text': backup.system_id + (" (local)" if backup.system_id == self._settings.system_id else "")}
+            time_info = {'text': backup.timestamp.strftime("%c"), 'sort': int(float(backup.timestamp.timestamp()))}
+            notes_info = {'text': "Double-click to restore", 'click_key':"backup~{}".format(backup.get_zip_name())}
+            backup_status.append([system_info, {'text': backup.account}, time_info, notes_info])
         self.set_main_window_backup_status_data.emit(backup_status)
 
 

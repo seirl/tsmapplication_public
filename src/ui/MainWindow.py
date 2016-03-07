@@ -202,7 +202,7 @@ class MainWindow(QMainWindow):
         self._ui.backup_system_text.setText(system_text)
         self._backup_status_table_model.set_info(data)
         self._ui.backup_status_table.resizeColumnsToContents()
-        self._ui.backup_status_table.sortByColumn(1, Qt.DescendingOrder)
+        self._ui.backup_status_table.sortByColumn(2, Qt.DescendingOrder)
 
 
     def show_notification(self, message, critical):

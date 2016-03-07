@@ -67,19 +67,25 @@ class AppAPI:
             'Accept-Encoding': 'gzip',
         }
         if data:
+            should_gzip = True
+            print(type(data))
             if type(data) == str:
                 headers['Content-Type'] = "text/plain"
+            elif type(data) == bytes:
+                headers['Content-Type'] = "application/octet-stream"
+                should_gzip = False
             elif type(data) in [list, dict]:
                 data = json.dumps(data)
                 headers['Content-Type'] = "application/json"
             else:
                 raise Exception("Invalid data type ({})!".format(type(data)))
-            # gzip the data
-            buffer = BytesIO()
-            with GzipFile(fileobj=buffer, mode="wb") as f:
-                f.write(bytes(data, 'UTF-8'))
-            data = buffer.getvalue()
-            headers['Content-Encoding'] = "gzip"
+            if should_gzip:
+                # gzip the data
+                buffer = BytesIO()
+                with GzipFile(fileobj=buffer, mode="wb") as f:
+                    f.write(bytes(data, 'UTF-8'))
+                data = buffer.getvalue()
+                headers['Content-Encoding'] = "gzip"
         current_time = int(time())
         if alt_url:
             url = alt_url
@@ -207,3 +213,12 @@ class AppAPI:
             return self._make_request("app", "win" if Config.IS_WINDOWS else "mac", path)
         else:
             return self._make_request("app", "win" if Config.IS_WINDOWS else "mac")
+
+
+    def backup(self, name=None, data=None):
+        if name and data:
+            return self._make_request("backup", b64encode(name.encode("ascii")).decode("ascii"), data=data)
+        elif name:
+            return self._make_request("backup", b64encode(name.encode("ascii")).decode("ascii"))
+        else:
+            return self._make_request("backup")['backups']

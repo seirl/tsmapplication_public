@@ -63,6 +63,7 @@ DEFAULT_SETTINGS = {
     'news_notification': True,
     'close_reason': CLOSE_REASON_NORMAL,
     'system_id': "",
+    'backup_path': "",
 }
 DEFAULT_OLD_LOGIN_SETTINGS = {
     'userId': 0,
