@@ -38,11 +38,14 @@ UPDATER_PATH = os.path.join("updater", "TSMUpdater.exe") if IS_WINDOWS else os.p
 NEW_APP_PATH = os.path.join("app_new", "TSMApplication.exe") if IS_WINDOWS else os.path.join("app_new", "TSMApplication")
 SETTINGS_VERSION = 2
 
-# close reasons
+# Close reasons
 CLOSE_REASON_NORMAL = 0
 CLOSE_REASON_CRASH = 1
 CLOSE_REASON_UPDATE = 2
 CLOSE_REASON_UNKNOWN = 99
+
+# Global constants set once at runtime
+SYSTEM_ID = None
 
 # Default settings
 DEFAULT_SETTINGS = {

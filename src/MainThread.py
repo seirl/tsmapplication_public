@@ -28,6 +28,7 @@ from PyQt5.QtGui import QDesktopServices, QIcon
 from PyQt5.QtWidgets import QMessageBox
 
 # General python modules
+from datetime import datetime
 from enum import Enum
 from hashlib import md5, sha512
 from io import BytesIO
@@ -149,6 +150,7 @@ class MainThread(QThread):
                 result += alphabet[mac % 64]
                 mac //= 64;
             self._settings.system_id = result
+        Config.SYSTEM_ID = self._settings.system_id
         if not self._settings.backup_path:
             self._settings.backup_path = os.path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), "Backups")
             os.makedirs(self._settings.backup_path, exist_ok=True)
@@ -169,7 +171,7 @@ class MainThread(QThread):
         self._sleep_time = 0
         self._addon_versions = []
         self._data_sync_status = {}
-        self._remote_backups = []
+        self._backups = []
         self._last_news = ""
         self._is_logged_out = None
         self._status_message = ""
@@ -478,26 +480,46 @@ class MainThread(QThread):
             for text in download_notifications:
                 self.show_desktop_notification.emit(text, False)
         self._set_main_window_status("One moment. Backing up addon settings...", False)
-        backed_up_accounts = self._wow_helper.set_addons_and_do_backups(installed_addons)
+        new_backups = self._wow_helper.set_addons_and_do_backups(installed_addons)
         if self._settings.backup_notification:
-            for account in backed_up_accounts:
-                self.show_desktop_notification.emit("Created backup for {}".format(account), False)
-        self._remote_backups = []
+            for backup in new_backups:
+                self.show_desktop_notification.emit("Created backup for {}".format(backup.account), False)
         if self._api.get_is_premium():
-            self._set_main_window_status("One moment. Uploading backups...", False)
+            # send the new backups to the TSM servers
+            for backup in new_backups:
+                zip_path = os.path.abspath(os.path.join(self._settings.backup_path, backup.get_local_zip_name()))
+                with open(zip_path, "rb") as f:
+                    self._api.backup(backup.get_remote_zip_name(), f.read())
+
+        # set the list of backups to just the local ones first
+        self._backups = self._wow_helper.get_backups()
+        if self._api.get_is_premium():
+            self._set_main_window_status("One moment. Getting backup status...", False)
             # get remote backups
             try:
-                remote_backup_names = self._api.backup()
-                for remote_zip_name in remote_backup_names:
-                    self._remote_backups.append(Backup(remote_zip_name))
-                # upload backups if necessary
-                for backup in self._wow_helper.get_backups():
-                    if backup.get_remote_zip_name() not in remote_backup_names:
-                        backup_data = self._wow_helper.get_raw_backup_data(backup)
-                        if backup_data:
-                            self._api.backup(backup.get_remote_zip_name(), backup_data)
+                remote_backup_info = self._api.backup()
             except (ApiError, ApiTransientError) as e:
+                remote_backup_info = None
                 self._logger.error("Got error from backup API: {}".format(str(e)))
+            if remote_backup_info:
+                # add the remote backups to the list
+                for key, backups in remote_backup_info.items():
+                    system_id, account = key.split(Config.BACKUP_NAME_SEPARATOR)
+                    for backup_info in backups:
+                        backup = Backup(system_id=system_id, account=account,
+                                        timestamp=datetime.fromtimestamp(backup_info['timestamp']),
+                                        keep=backup_info['keep'], is_local=False, is_remote=True)
+                        tracked = False
+                        if system_id == Config.SYSTEM_ID:
+                            # check if we also have this backup locally
+                            for i, local_backup in enumerate(self._backups):
+                                if backup == local_backup:
+                                    local_backup.keep = backup.keep
+                                    local_backup.is_remote = True
+                                    tracked = True
+                                    break
+                        if not tracked:
+                            self._backups.append(backup)
         self._update_backup_status()
 
         # update addon status again incase we changed something (i.e. downloaded updates or deleted an old addon)
@@ -686,11 +708,18 @@ class MainThread(QThread):
 
     def _update_backup_status(self):
         backup_status = []
-        for backup in self._wow_helper.get_backups() + [x for x in self._remote_backups if x.system_id != self._settings.system_id]:
-            system_info = {'text': backup.system_id + (" (local)" if backup.system_id == self._settings.system_id else "")}
+        for backup in self._backups:
+            system_info = {'text': backup.system_id + (" (local)" if backup.is_local else "")}
             time_info = {'text': backup.timestamp.strftime("%c"), 'sort': int(float(backup.timestamp.timestamp()))}
-            notes_info = {'text': "Double-click to restore", 'click_key':"backup~{}".format(backup.get_zip_name())}
-            backup_status.append([system_info, {'text': backup.account}, time_info, notes_info])
+            if backup.is_local and backup.is_remote:
+                sync_text = "Synced with TSM servers"
+            elif backup.is_remote:
+                sync_text = "Remote backup"
+            elif backup.is_local:
+                sync_text = "Local backup (not synced)"
+            else:
+                raise Exception("Invalid backup!")
+            backup_status.append([system_info, {'text': backup.account}, time_info, {'text': sync_text, 'click_key': "backup~{}".format(backup.get_zip_name())}])
         self.set_main_window_backup_status_data.emit(backup_status)
 
 

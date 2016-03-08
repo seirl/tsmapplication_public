@@ -334,11 +334,11 @@ class WoWHelper(QObject):
             if Config.BACKUP_NAME_SEPARATOR in account_name:
                 # can't backup this account
                 continue
-            zip_name = "{}_{}.zip".format(account_name, datetime.now().strftime(Config.BACKUP_TIME_FORMAT))
-            with ZipFile(os.path.join(backup_path, zip_name), 'w', ZIP_LZMA) as zip:
+            new_backup = Backup(system_id=Config.SYSTEM_ID, account=account_name, timestamp=datetime.now(), is_local=True, is_remote=False)
+            with ZipFile(os.path.join(backup_path, new_backup.get_local_zip_name()), 'w', ZIP_LZMA) as zip:
                 for sv_path in self._saved_variables_iterator(account_name):
                     zip.write(sv_path, os.path.basename(sv_path))
-            backed_up.append(account_name)
+            backed_up.append(new_backup)
             logging.getLogger().info("Created backup for account ({})".format(account_name))
         return backed_up
 
@@ -347,16 +347,10 @@ class WoWHelper(QObject):
         backups = []
         for file_path in os.listdir(self._settings.backup_path):
             try:
-                backups.append(Backup(os.path.basename(file_path)))
+                backups.append(Backup(zip_name=os.path.basename(file_path), is_local=True, is_remote=False))
             except ValueError:
                 pass
         return backups
-
-
-    def get_raw_backup_data(self, backup):
-        zip_path = os.path.abspath(os.path.join(self._settings.backup_path, backup.get_local_zip_name()))
-        with open(zip_path, "rb") as f:
-            return f.read()
 
 
     def restore_backup(self, account, timestamp):

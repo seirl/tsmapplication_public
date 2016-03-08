@@ -221,4 +221,4 @@ class AppAPI:
         elif name:
             return self._make_request("backup", b64encode(name.encode("ascii")).decode("ascii"))
         else:
-            return self._make_request("backup")['backups']
+            return self._make_request("backup")['data']

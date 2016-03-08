@@ -82,7 +82,7 @@ class MainWindow(QMainWindow):
         self._addon_status_table_model = TableModel(self, ['Name', 'Version', 'Status'])
         self._ui.addon_status_table.setModel(self._addon_status_table_model)
 
-        self._backup_status_table_model = TableModel(self, ['System ID', 'Account', 'Timestamp', 'Notes'])
+        self._backup_status_table_model = TableModel(self, ['System ID', 'Account', 'Timestamp', 'Sync Status'])
         self._ui.backup_status_table.setModel(self._backup_status_table_model)
 
         self._accounting_info = {}
@@ -198,7 +198,7 @@ class MainWindow(QMainWindow):
                       "<a href=\"http://tradeskillmaster.com/premium\" style=\"color: #EC7800\">Premium users</a> " + \
                       "can sync backups to the cloud and across multiple computers. Otherwise, only backups from the " + \
                       "local system (<font style=\"color: cyan\">{}</font>) will be listed below." \
-                      .format(self._settings.system_id)
+                      .format(Config.SYSTEM_ID)
         self._ui.backup_system_text.setText(system_text)
         self._backup_status_table_model.set_info(data)
         self._ui.backup_status_table.resizeColumnsToContents()

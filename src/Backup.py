@@ -16,30 +16,45 @@
 
 # Local modules
 import Config
-from Settings import load_settings
 
 # General python modules
 from datetime import datetime
 import re
 
 
-class Backup:
-    def __init__(self, zip_name):
-        self._settings = load_settings(Config.DEFAULT_SETTINGS)
-        if not zip_name.endswith(".zip"):
-            raise ValueError("Invalid zip name")
-        elif zip_name.count(Config.BACKUP_NAME_SEPARATOR) == 1:
-            self.is_remote = False
-            self.system_id = self._settings.system_id
-            self.account, self.timestamp = zip_name[:-4].split(Config.BACKUP_NAME_SEPARATOR)
-        elif zip_name.count(Config.BACKUP_NAME_SEPARATOR) == 2:
-            self.is_remote = True
-            self.system_id, self.account, self.timestamp = zip_name[:-4].split(Config.BACKUP_NAME_SEPARATOR)
+class Backup(object):
+    """
+    Can construct by specifying:
+     - (`zip_name`, `is_local`, `is_remote`)
+     - (`system_id`, `account`, `timestamp`, `is_local`, `is_remote`)
+    """
+    def __init__(self, *args, **kwargs):
+        assert(len(args) == 0)
+        self.is_local = kwargs['is_local']
+        self.is_remote = kwargs['is_remote']
+        zip_name = kwargs.get('zip_name', None)
+        if zip_name:
+            if not zip_name.endswith(".zip"):
+                raise ValueError("Invalid zip name")
+            elif zip_name.count(Config.BACKUP_NAME_SEPARATOR) == 1:
+                self.system_id = Config.SYSTEM_ID
+                self.account, self.timestamp = zip_name[:-4].split(Config.BACKUP_NAME_SEPARATOR)
+                self.timestamp = datetime.strptime(self.timestamp, Config.BACKUP_TIME_FORMAT)
+            elif zip_name.count(Config.BACKUP_NAME_SEPARATOR) == 2:
+                self.system_id, self.account, self.timestamp = zip_name[:-4].split(Config.BACKUP_NAME_SEPARATOR)
+                self.timestamp = datetime.fromtimestamp(int(self.timestamp))
+            else:
+                raise ValueError("Invalid account")
         else:
-            raise ValueError("Invalid account")
-        self.timestamp = datetime.strptime(self.timestamp, Config.BACKUP_TIME_FORMAT)
+            self.system_id = kwargs['system_id']
+            self.account = kwargs['account']
+            self.timestamp = kwargs['timestamp']
+        self.keep = kwargs.get('keep', False)
         if re.match("[^a-zA-Z0-9#]", self.account):
             raise ValueError("Invalid account")
+
+    def __eq__(self, other):
+        return self.system_id == other.system_id and self.account == other.account and self.timestamp == other.timestamp
 
     def get_zip_name(self):
         if self.is_remote:
@@ -51,4 +66,5 @@ class Backup:
         return Config.BACKUP_NAME_SEPARATOR.join([self.account, self.timestamp.strftime(Config.BACKUP_TIME_FORMAT)]) + ".zip"
 
     def get_remote_zip_name(self):
-        return Config.BACKUP_NAME_SEPARATOR.join([self.system_id, self.account, self.timestamp.strftime(Config.BACKUP_TIME_FORMAT)]) + ".zip"
+        epoch = datetime.fromtimestamp(0)
+        return Config.BACKUP_NAME_SEPARATOR.join([self.system_id, self.account, str(int((self.timestamp-epoch).total_seconds()))]) + ".zip"
