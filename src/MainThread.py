@@ -498,6 +498,7 @@ class MainThread(QThread):
             for backup in new_backups:
                 zip_path = os.path.abspath(os.path.join(self._settings.backup_path, backup.get_local_zip_name()))
                 with open(zip_path, "rb") as f:
+                    self._logger.info("Uploading backup: {}".format(backup.get_remote_zip_name()))
                     self._api.backup(backup.get_remote_zip_name(), f.read())
 
         # set the list of backups to just the local ones first
