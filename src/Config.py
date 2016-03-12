@@ -37,6 +37,7 @@ MAX_BLACK_MARKET_AGE = 24 * 60 * 60
 UPDATER_PATH = os.path.join("updater", "TSMUpdater.exe") if IS_WINDOWS else os.path.join("updater", "TSMUpdater")
 NEW_APP_PATH = os.path.join("app_new", "TSMApplication.exe") if IS_WINDOWS else os.path.join("app_new", "TSMApplication")
 SETTINGS_VERSION = 2
+TEMP_BACKUP_DIR = "TempBackups"
 
 # Close reasons
 CLOSE_REASON_NORMAL = 0

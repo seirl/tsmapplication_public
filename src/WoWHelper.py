@@ -53,6 +53,7 @@ class WoWHelper(QObject):
         self._addons = []
         self._settings = load_settings(Config.DEFAULT_SETTINGS)
         self._saved_variables = {}
+        self._temp_backup_path = os.path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), Config.TEMP_BACKUP_DIR)
 
         # load the WoW path
         if not self.set_wow_path(self._settings.wow_path):
@@ -353,16 +354,17 @@ class WoWHelper(QObject):
         return backups
 
 
-    def restore_backup(self, account, timestamp):
-        self._do_backup(account)
-        backup_path = self._settings.backup_path
-        zip_path = os.path.abspath(os.path.join(backup_path, "{}_{}.zip".format(account, timestamp)))
+    def restore_backup(self, backup):
+        if backup.is_local:
+            zip_path = os.path.abspath(os.path.join(self._settings.backup_path, backup.get_local_zip_name()))
+        else:
+            zip_path = os.path.abspath(os.path.join(self._temp_backup_path, backup.get_remote_zip_name()))
         if not os.path.isfile(zip_path):
             logging.getLogger().error("Could not find backup: {}".format(zip_path))
             return False
         with ZipFile(zip_path) as zip:
-            zip.extractall(self._get_saved_variables_path(account))
-        logging.getLogger().info("Restored backup ({}, {})".format(account, timestamp))
+            zip.extractall(self._get_saved_variables_path(backup.account))
+        logging.getLogger().info("Restored backup ({})".format(str(backup)))
         return True
 
 

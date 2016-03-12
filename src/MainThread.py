@@ -154,6 +154,8 @@ class MainThread(QThread):
         if not self._settings.backup_path:
             self._settings.backup_path = os.path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), "Backups")
             os.makedirs(self._settings.backup_path, exist_ok=True)
+        self._temp_backup_path = os.path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), Config.TEMP_BACKUP_DIR)
+        os.makedirs(self._temp_backup_path, exist_ok=True)
 
         # initialize other helper classes
         self._api = AppAPI()
@@ -251,17 +253,8 @@ class MainThread(QThread):
                         return
                 except:
                     pass
-            backup = Backup(*parts)
-            if backup.is_remote():
-                # TODO - download the remote backup first
-                msg_box = QMessageBox()
-                msg_box.setWindowIcon(QIcon(":/resources/logo.png"))
-                msg_box.setWindowModality(Qt.ApplicationModal)
-                msg_box.setIcon(QMessageBox.Warning)
-                msg_box.setText("NOT YET IMPLEMENTED!")
-                msg_box.setStandardButtons(QMessageBox.Ok)
-                msg_box.exec_()
-            else:
+            backup = self._backups[int(parts[0])]
+            if backup.is_local:
                 success = self._wow_helper.restore_backup(backup)
                 msg_box = QMessageBox()
                 msg_box.setWindowIcon(QIcon(":/resources/logo.png"))
@@ -270,6 +263,22 @@ class MainThread(QThread):
                 msg_box.setText("Restored backup successfully!" if success else "Failed to restore backup!")
                 msg_box.setStandardButtons(QMessageBox.Ok)
                 msg_box.exec_()
+            else:
+                # download the backup first
+                zip_data = self._api.backup(backup.get_remote_zip_name())
+                temp_path = os.path.join(self._temp_backup_path, backup.get_remote_zip_name())
+                with open(temp_path, "wb") as f:
+                    f.write(zip_data)
+                success = self._wow_helper.restore_backup(backup)
+                msg_box = QMessageBox()
+                msg_box.setWindowIcon(QIcon(":/resources/logo.png"))
+                msg_box.setWindowModality(Qt.ApplicationModal)
+                msg_box.setIcon(QMessageBox.Information if success else QMessageBox.Warning)
+                msg_box.setText("Restored backup successfully!" if success else "Failed to restore backup!")
+                msg_box.setStandardButtons(QMessageBox.Ok)
+                msg_box.exec_()
+                # remove the temporary file
+                os.remove(temp_path)
         elif table == "changes":
             addon = parts.pop(0)
             if addon == "TradeSkillMaster":
@@ -708,18 +717,22 @@ class MainThread(QThread):
 
     def _update_backup_status(self):
         backup_status = []
-        for backup in self._backups:
-            system_info = {'text': backup.system_id + (" (local)" if backup.is_local else "")}
+        for i, backup in enumerate(self._backups):
+            system_info = {'text': backup.system_id + (" (local)" if backup.system_id == Config.SYSTEM_ID else "")}
             time_info = {'text': backup.timestamp.strftime("%c"), 'sort': int(float(backup.timestamp.timestamp()))}
+            sync_text = "[Saved] " if backup.keep else ""
             if backup.is_local and backup.is_remote:
-                sync_text = "Synced with TSM servers"
+                sync_text += "Synced"
             elif backup.is_remote:
-                sync_text = "Remote backup"
+                sync_text += "Remote backup"
             elif backup.is_local:
-                sync_text = "Local backup (not synced)"
+                sync_text += "Local backup (not synced)"
             else:
                 raise Exception("Invalid backup!")
-            backup_status.append([system_info, {'text': backup.account}, time_info, {'text': sync_text, 'click_key': "backup~{}".format(backup.get_zip_name())}])
+            cells = [system_info, {'text': backup.account}, time_info, {'text': sync_text}]
+            for cell in cells:
+                cell['click_key'] = "backup~{}".format(i)
+            backup_status.append(cells)
         self.set_main_window_backup_status_data.emit(backup_status)
 
 

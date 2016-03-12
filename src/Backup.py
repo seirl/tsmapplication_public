@@ -53,6 +53,10 @@ class Backup(object):
         if re.match("[^a-zA-Z0-9#]", self.account):
             raise ValueError("Invalid account")
 
+    def __str__(self):
+        return "<system_id={}, account={}, timestamp={}, is_local={}, is_remote={}, keep={}>" \
+               .format(self.system_id, self.account, self.timestamp.strftime(Config.BACKUP_TIME_FORMAT), self.is_local, self.is_remote, self.keep)
+
     def __eq__(self, other):
         return self.system_id == other.system_id and self.account == other.account and self.timestamp == other.timestamp
 
