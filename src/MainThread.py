@@ -141,7 +141,7 @@ class MainThread(QThread):
 
         # set system ID if it's not already set
         if not self._settings.system_id:
-            alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+            alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-="
             assert(len(alphabet) == 64)
             mac = uuid.getnode()
             assert(mac < 2 ** 48)
