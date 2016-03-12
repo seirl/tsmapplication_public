@@ -195,8 +195,8 @@ class MainWindow(QMainWindow):
 
     def set_backup_status_data(self, data):
         system_text = "The system ID is unique to the computer you are running the desktop app from. " \
-                      "<a href=\"http://tradeskillmaster.com/premium\" style=\"color: #EC7800\">Premium users</a> " \
-                      "can sync backups to the cloud and across multiple computers. Otherwise, only backups from " \
+                      "<a href=\"http://tradeskillmaster.com/user/backups\" style=\"color: #EC7800\">Premium users " \
+                      "can sync backups</a> to the cloud and across multiple computers. Otherwise, only backups from " \
                       "the local system (<font style=\"color: cyan\">{}</font>) will be listed below.<br><br>To " \
                       "restore a backup, double-click on the row in the table below.".format(Config.SYSTEM_ID)
         self._ui.backup_system_text.setText(system_text)
