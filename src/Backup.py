@@ -70,5 +70,5 @@ class Backup(object):
         return Config.BACKUP_NAME_SEPARATOR.join([self.account, self.timestamp.strftime(Config.BACKUP_TIME_FORMAT)]) + ".zip"
 
     def get_remote_zip_name(self):
-        epoch = datetime.fromtimestamp(0)
+        epoch = datetime.utcfromtimestamp(0)
         return Config.BACKUP_NAME_SEPARATOR.join([self.system_id, self.account, str(int((self.timestamp-epoch).total_seconds()))]) + ".zip"

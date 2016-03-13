@@ -796,7 +796,7 @@ class MainThread(QThread):
         os.chdir(base_path)
         app_path = os.path.join(base_path, "app")
 
-        # create a manifest (look table of path -> hash) for the current app files
+        # create a manifest (lookup table of path -> hash) for the current app files
         app_file_md5 = {}
         for root_path, _, files in os.walk(app_path):
             root_path = os.path.relpath(root_path, app_path)
