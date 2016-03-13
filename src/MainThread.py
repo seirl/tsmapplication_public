@@ -265,11 +265,17 @@ class MainThread(QThread):
                 msg_box.exec_()
             else:
                 # download the backup first
-                zip_data = self._api.backup(backup.get_remote_zip_name())
-                temp_path = os.path.join(self._temp_backup_path, backup.get_remote_zip_name())
-                with open(temp_path, "wb") as f:
-                    f.write(zip_data)
-                success = self._wow_helper.restore_backup(backup)
+                try:
+                    zip_data = self._api.backup(backup.get_remote_zip_name())
+                    temp_path = os.path.join(self._temp_backup_path, backup.get_remote_zip_name())
+                    with open(temp_path, "wb") as f:
+                        f.write(zip_data)
+                    success = self._wow_helper.restore_backup(backup)
+                    # remove the temporary file
+                    os.remove(temp_path)
+                except (ApiError, ApiTransientError) as e:
+                    self._logger.error("Got error from backup API: {}".format(str(e)))
+                    success = False
                 msg_box = QMessageBox()
                 msg_box.setWindowIcon(QIcon(":/resources/logo.png"))
                 msg_box.setWindowModality(Qt.ApplicationModal)
@@ -277,8 +283,6 @@ class MainThread(QThread):
                 msg_box.setText("Restored backup successfully!" if success else "Failed to restore backup!")
                 msg_box.setStandardButtons(QMessageBox.Ok)
                 msg_box.exec_()
-                # remove the temporary file
-                os.remove(temp_path)
         elif table == "changes":
             addon = parts.pop(0)
             if addon == "TradeSkillMaster":
@@ -499,7 +503,10 @@ class MainThread(QThread):
                 zip_path = os.path.abspath(os.path.join(self._settings.backup_path, backup.get_local_zip_name()))
                 with open(zip_path, "rb") as f:
                     self._logger.info("Uploading backup: {}".format(backup.get_remote_zip_name()))
-                    self._api.backup(backup.get_remote_zip_name(), f.read())
+                    try:
+                        self._api.backup(backup.get_remote_zip_name(), f.read())
+                    except (ApiError, ApiTransientError) as e:
+                        self._logger.error("Got error from backup API: {}".format(str(e)))
 
         # set the list of backups to just the local ones first
         self._backups = self._wow_helper.get_backups()
