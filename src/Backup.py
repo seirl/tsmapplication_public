@@ -18,7 +18,6 @@
 import Config
 
 # General python modules
-import calendar
 from datetime import datetime, timedelta
 import re
 import time
