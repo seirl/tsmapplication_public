@@ -18,8 +18,10 @@
 import Config
 
 # General python modules
-from datetime import datetime
+import calendar
+from datetime import datetime, timedelta
 import re
+import time
 
 
 class Backup(object):
@@ -33,13 +35,18 @@ class Backup(object):
         self.is_local = kwargs['is_local']
         self.is_remote = kwargs['is_remote']
         zip_name = kwargs.get('zip_name', None)
+        self.raw_timestamp = None
         if zip_name:
             if not zip_name.endswith(".zip"):
                 raise ValueError("Invalid zip name")
             elif zip_name.count(Config.BACKUP_NAME_SEPARATOR) == 1:
                 self.system_id = Config.SYSTEM_ID
                 self.account, self.timestamp = zip_name[:-4].split(Config.BACKUP_NAME_SEPARATOR)
-                self.timestamp = datetime.strptime(self.timestamp, Config.BACKUP_TIME_FORMAT)
+                if self.timestamp[:2] != "20":
+                    self.raw_timestamp = int(self.timestamp)
+                    self.timestamp = datetime.utcfromtimestamp(int(self.timestamp))
+                else:
+                    self.timestamp = datetime.strptime(self.timestamp, Config.BACKUP_TIME_FORMAT)
             elif zip_name.count(Config.BACKUP_NAME_SEPARATOR) == 2:
                 self.system_id, self.account, self.timestamp = zip_name[:-4].split(Config.BACKUP_NAME_SEPARATOR)
                 self.timestamp = datetime.fromtimestamp(int(self.timestamp))
@@ -55,7 +62,7 @@ class Backup(object):
 
     def __str__(self):
         return "<system_id={}, account={}, timestamp={}, is_local={}, is_remote={}, keep={}>" \
-               .format(self.system_id, self.account, self.timestamp.strftime(Config.BACKUP_TIME_FORMAT), self.is_local, self.is_remote, self.keep)
+               .format(self.system_id, self.account, str(self.timestamp), self.is_local, self.is_remote, self.keep)
 
     def __eq__(self, other):
         return self.system_id == other.system_id and self.account == other.account and self.timestamp == other.timestamp
@@ -67,8 +74,15 @@ class Backup(object):
             return self.get_local_zip_name()
 
     def get_local_zip_name(self):
-        return Config.BACKUP_NAME_SEPARATOR.join([self.account, self.timestamp.strftime(Config.BACKUP_TIME_FORMAT)]) + ".zip"
+        if self.raw_timestamp:
+            return Config.BACKUP_NAME_SEPARATOR.join([self.account, str(self.raw_timestamp)]) + ".zip"
+        else:
+            return Config.BACKUP_NAME_SEPARATOR.join([self.account, self.timestamp.strftime(Config.BACKUP_TIME_FORMAT)]) + ".zip"
 
     def get_remote_zip_name(self):
-        epoch = datetime.utcfromtimestamp(0)
-        return Config.BACKUP_NAME_SEPARATOR.join([self.system_id, self.account, str(int((self.timestamp-epoch).total_seconds()))]) + ".zip"
+        if self.raw_timestamp:
+            return Config.BACKUP_NAME_SEPARATOR.join([self.system_id, self.account, str(self.raw_timestamp)]) + ".zip"
+        else:
+            epoch = datetime.utcfromtimestamp(0)
+            offset = time.altzone if time.daylight else time.timezone
+            return Config.BACKUP_NAME_SEPARATOR.join([self.system_id, self.account, str(int((self.timestamp + timedelta(seconds=offset) - epoch).total_seconds()))]) + ".zip"

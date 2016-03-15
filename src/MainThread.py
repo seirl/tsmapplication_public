@@ -635,7 +635,11 @@ class MainThread(QThread):
         if not hit_error and self._settings.realm_data_notification and updated_realms:
             self.show_desktop_notification.emit("Updated Great Deals for {}".format(" / ".join(updated_realms)), False)
 
-        lua_versions = "{" + ",".join("{}={}".format(x['name'], x['version']) for x in self._addon_versions) + "}"
+        tsm_version_type, tsm_version_int, _ = self._wow_helper.get_installed_version("TradeSkillMaster")
+        if tsm_version_type == WoWHelper.RELEASE_VERSION and tsm_version_int >= 3030600:
+            lua_versions = "{" + ",".join("{}={}".format(x['name'], x['version']) for x in self._addon_versions) + "}"
+        else:
+            lua_versions = "{}"
         addon_message = "{{id={id},msg=\"{msg}\"}}".format(**result['addonMessage'])
         app_data.update("APP_INFO", "Global", "{{version={},lastSync={},addonVersions={},message={}}}" \
                         .format(Config.CURRENT_VERSION, int(time()), lua_versions, addon_message), \
