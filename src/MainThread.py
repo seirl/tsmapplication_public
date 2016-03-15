@@ -151,7 +151,7 @@ class MainThread(QThread):
                 mac //= 64;
             self._settings.system_id = result
         Config.SYSTEM_ID = self._settings.system_id
-        if not self._settings.backup_path:
+        if not self._settings.backup_path or not os.path.isdir(self._settings.backup_path):
             self._settings.backup_path = os.path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), "Backups")
             os.makedirs(self._settings.backup_path, exist_ok=True)
         self._temp_backup_path = os.path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), Config.TEMP_BACKUP_DIR)
@@ -636,7 +636,7 @@ class MainThread(QThread):
             self.show_desktop_notification.emit("Updated Great Deals for {}".format(" / ".join(updated_realms)), False)
 
         tsm_version_type, tsm_version_int, _ = self._wow_helper.get_installed_version("TradeSkillMaster")
-        if tsm_version_type == WoWHelper.RELEASE_VERSION and tsm_version_int >= 3030600:
+        if tsm_version_type == WoWHelper.RELEASE_VERSION and tsm_version_int >= app_info['minTSMUpdateNotificationVersion']:
             lua_versions = "{" + ",".join("{}={}".format(x['name'], x['version']) for x in self._addon_versions) + "}"
         else:
             lua_versions = "{}"
