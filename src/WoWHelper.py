@@ -383,12 +383,34 @@ class WoWHelper(QObject):
                 logging.getLogger().warn("No black market data for {}".format(account))
                 continue
             for realm, data in account_data.items():
-                if data['updateTime'] < (int(time()) - Config.MAX_BLACK_MARKET_AGE):
+                if data['updateTime'] < (int(time()) - Config.MAX_DATA_AGE):
                     # data is too old to bother uploading
                     continue
                 key = (region, realm)
                 if key not in result or result[key]['updateTime'] < data['updateTime']:
                     result[key] = data
+        return result
+
+
+    def get_wow_token_data(self):
+        result = {}
+        for account in self.get_accounts():
+            data = self._get_saved_variables(account, "TradeSkillMaster_AppHelper")
+            if not data:
+                continue
+            try:
+                account_data = data['wowToken']
+                if not account_data:
+                    continue
+            except KeyError as e:
+                logging.getLogger().warn("No WoW token data for {}".format(account))
+                continue
+            for region, region_data in account_data.items():
+                if region_data['updateTime'] < (int(time()) - Config.MAX_DATA_AGE):
+                    # data is too old to bother uploading
+                    continue
+                if region not in result or result[region]['updateTime'] < region_data['updateTime']:
+                    result[region] = region_data
         return result
 
 

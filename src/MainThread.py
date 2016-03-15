@@ -758,6 +758,14 @@ class MainThread(QThread):
             except (ApiError, ApiTransientError) as e:
                 self._logger.error("Got error from black market API: {}".format(str(e)))
 
+        # upload WoW token data
+        for region, data in self._wow_helper.get_wow_token_data().items():
+            try:
+                if self._api.wow_token(region, data, data['updateTime']):
+                    self._logger.info("Uploaded WoW token data ({})!".format(region))
+            except (ApiError, ApiTransientError) as e:
+                self._logger.error("Got error from black market API: {}".format(str(e)))
+
         # upload sales data
         for key, data in self._wow_helper.get_accounting_data().items():
             region, realm, account = key

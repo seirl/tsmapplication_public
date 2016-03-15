@@ -184,6 +184,16 @@ class AppAPI:
         return False
 
 
+    def wow_token(self, region, data, update_time):
+        # first, get the last update time
+        last_update = self._make_request("wow_token", region)['lastUpdate']
+        if update_time > last_update:
+            # this data is newer than what's on the server, so upload it
+            self._make_request("wow_token", region, data=data)
+            return True
+        return False
+
+
     def sales(self, region, realm, account, data=None):
         realm = b64encode(realm.encode("utf8")).decode("ascii")
         account = b64encode(account.encode("utf8")).decode("ascii")
