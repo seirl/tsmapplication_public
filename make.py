@@ -27,6 +27,9 @@ import sys
 from zipfile import ZipFile, ZIP_DEFLATED
 
 
+# the curent app version
+APP_VERSION = 304
+
 # a list of all supported operations
 SUPPORTED_OPERATIONS = ["clean", "build", "run", "dist_win", "dist_mac"]
 
@@ -197,6 +200,13 @@ class Operations:
             built_file_path = os.path.join(BUILD_DIR, "{}_ui.py".format(os.path.splitext(os.path.basename(path))[0]))
             with open(built_file_path, 'w') as py_file:
                 uic.compileUi(path, py_file)
+
+        # generate _version.py
+        with open(os.path.join(BUILD_DIR, "_version.py"), "w") as f:
+            f.write("VERSION={}\n".format(APP_VERSION))
+            import subprocess
+            commit = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode("ascii").strip()
+            f.write("COMMIT=\"{}\"\n".format(commit))
 
 
     @staticmethod

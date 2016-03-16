@@ -302,14 +302,13 @@ class WoWHelper(QObject):
 
     def _do_backup(self, account=None):
         accounts = [account] if account else self.get_accounts()
-        backup_path = self._settings.backup_path
         backed_up = []
         backups = self.get_backups()
         for account_name in accounts:
             # delete expired backups first so we'll do a new backup if the most recent one expired
             backup_times = []
             for backup in [x for x in backups if x.account == account_name]:
-                path = os.path.join(self._settings.backup_path, backup.get_local_zip_name())
+                path = os.path.join(Config.BACKUP_DIR_PATH, backup.get_local_zip_name())
                 if (datetime.now() - backup.timestamp) > timedelta(seconds=self._settings.backup_expire):
                     logging.getLogger().info("Purged old backup for account ({}): {}".format(account_name, path))
                     os.remove(path)
@@ -336,7 +335,7 @@ class WoWHelper(QObject):
                 # can't backup this account
                 continue
             new_backup = Backup(system_id=Config.SYSTEM_ID, account=account_name, timestamp=datetime.now(), is_local=True, is_remote=False)
-            with ZipFile(os.path.join(backup_path, new_backup.get_local_zip_name()), 'w', ZIP_LZMA) as zip:
+            with ZipFile(os.path.join(Config.BACKUP_DIR_PATH, new_backup.get_local_zip_name()), 'w', ZIP_LZMA) as zip:
                 for sv_path in self._saved_variables_iterator(account_name):
                     zip.write(sv_path, os.path.basename(sv_path))
             backed_up.append(new_backup)
@@ -346,7 +345,9 @@ class WoWHelper(QObject):
 
     def get_backups(self):
         backups = []
-        for file_path in os.listdir(self._settings.backup_path):
+        if not os.path.isdir(Config.BACKUP_DIR_PATH):
+            os.makedirs(Config.BACKUP_DIR_PATH, exist_ok=True)
+        for file_path in os.listdir(Config.BACKUP_DIR_PATH):
             try:
                 backups.append(Backup(zip_name=os.path.basename(file_path), is_local=True, is_remote=False))
             except ValueError:
@@ -356,7 +357,7 @@ class WoWHelper(QObject):
 
     def restore_backup(self, backup):
         if backup.is_local:
-            zip_path = os.path.abspath(os.path.join(self._settings.backup_path, backup.get_local_zip_name()))
+            zip_path = os.path.abspath(os.path.join(Config.BACKUP_DIR_PATH, backup.get_local_zip_name()))
         else:
             zip_path = os.path.abspath(os.path.join(self._temp_backup_path, backup.get_remote_zip_name()))
         if not os.path.isfile(zip_path):

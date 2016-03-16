@@ -56,6 +56,8 @@ class TSMApp(QObject):
         app_data_dir = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
         os.makedirs(app_data_dir, exist_ok=True)
         Config.LOG_FILE_PATH = os.path.join(app_data_dir, "TSMApplication.log")
+        Config.BACKUP_DIR_PATH = os.path.join(app_data_dir, "Backups")
+        os.makedirs(Config.BACKUP_DIR_PATH, exist_ok=True)
         handler = RotatingFileHandler(Config.LOG_FILE_PATH, mode='w', maxBytes=200000, backupCount=1)
         handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s", "%m/%d/%Y %H:%M:%S"))
         handler.doRollover() # clear the log everytime we start
@@ -63,7 +65,7 @@ class TSMApp(QObject):
 
 
     def run(self):
-        self._logger.info("Starting TSM Application r{}".format(Config.CURRENT_VERSION))
+        self._logger.info("Starting TSM Application r{} ({})".format(Config.CURRENT_VERSION, Config.GIT_COMMIT))
 
         # Create the windows
         self._login_window = LoginWindow()

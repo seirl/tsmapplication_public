@@ -151,10 +151,7 @@ class MainThread(QThread):
                 mac //= 64;
             self._settings.system_id = result
         Config.SYSTEM_ID = self._settings.system_id
-        if not self._settings.backup_path or not os.path.isdir(self._settings.backup_path):
-            self._settings.backup_path = os.path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), "Backups")
-            os.makedirs(self._settings.backup_path, exist_ok=True)
-        self._temp_backup_path = os.path.join(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation), Config.TEMP_BACKUP_DIR)
+        self._temp_backup_path = os.path.abspath(os.path.join(Config.BACKUP_DIR_PATH, os.pardir, Config.TEMP_BACKUP_DIR))
         os.makedirs(self._temp_backup_path, exist_ok=True)
 
         # initialize other helper classes
@@ -500,7 +497,7 @@ class MainThread(QThread):
         if self._api.get_is_premium():
             # send the new backups to the TSM servers
             for backup in new_backups:
-                zip_path = os.path.abspath(os.path.join(self._settings.backup_path, backup.get_local_zip_name()))
+                zip_path = os.path.abspath(os.path.join(Config.BACKUP_DIR_PATH, backup.get_local_zip_name()))
                 with open(zip_path, "rb") as f:
                     self._logger.info("Uploading backup: {}".format(backup.get_remote_zip_name()))
                     try:

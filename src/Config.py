@@ -17,6 +17,9 @@
 import os
 import sys
 
+# auto-generated during the build
+import _version
+
 
 # Constant context parameters
 IS_WINDOWS = sys.platform.startswith("win32")
@@ -27,8 +30,10 @@ assert(IS_WINDOWS != IS_MAC) # only one should be set
 # General app constants
 ORG_NAME = "TradeSkillMaster"
 APP_NAME = "TSMApplication"
-CURRENT_VERSION = 304
+CURRENT_VERSION = _version.VERSION
+GIT_COMMIT = _version.COMMIT
 LOG_FILE_PATH = None
+BACKUP_DIR_PATH = None
 STATUS_CHECK_INTERVAL_S = 10 * 60
 APP_API_BASE_URL = "http://app-server.tradeskillmaster.com/v2"
 BACKUP_TIME_FORMAT = "%Y%m%d%H%M%S"
@@ -67,7 +72,6 @@ DEFAULT_SETTINGS = {
     'news_notification': True,
     'close_reason': CLOSE_REASON_NORMAL,
     'system_id': "",
-    'backup_path': "",
 }
 DEFAULT_OLD_LOGIN_SETTINGS = {
     'userId': 0,
