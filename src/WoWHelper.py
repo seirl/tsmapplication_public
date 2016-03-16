@@ -334,7 +334,7 @@ class WoWHelper(QObject):
             if Config.BACKUP_NAME_SEPARATOR in account_name:
                 # can't backup this account
                 continue
-            new_backup = Backup(system_id=Config.SYSTEM_ID, account=account_name, timestamp=datetime.now(), is_local=True, is_remote=False)
+            new_backup = Backup(system_id=Config.SYSTEM_ID, account=account_name, raw_timestamp=int(time()), is_local=True, is_remote=False)
             with ZipFile(os.path.join(Config.BACKUP_DIR_PATH, new_backup.get_local_zip_name()), 'w', ZIP_LZMA) as zip:
                 for sv_path in self._saved_variables_iterator(account_name):
                     zip.write(sv_path, os.path.basename(sv_path))

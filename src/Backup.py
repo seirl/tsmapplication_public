@@ -34,7 +34,7 @@ class Backup(object):
         self.is_local = kwargs['is_local']
         self.is_remote = kwargs['is_remote']
         zip_name = kwargs.get('zip_name', None)
-        self.raw_timestamp = None
+        self.raw_timestamp = kwargs.get('raw_timestamp', None)
         if zip_name:
             if not zip_name.endswith(".zip"):
                 raise ValueError("Invalid zip name")
@@ -43,18 +43,22 @@ class Backup(object):
                 self.account, self.timestamp = zip_name[:-4].split(Config.BACKUP_NAME_SEPARATOR)
                 if self.timestamp[:2] != "20":
                     self.raw_timestamp = int(self.timestamp)
-                    self.timestamp = datetime.utcfromtimestamp(int(self.timestamp))
+                    self.timestamp = datetime.fromtimestamp(int(self.timestamp))
                 else:
                     self.timestamp = datetime.strptime(self.timestamp, Config.BACKUP_TIME_FORMAT)
             elif zip_name.count(Config.BACKUP_NAME_SEPARATOR) == 2:
                 self.system_id, self.account, self.timestamp = zip_name[:-4].split(Config.BACKUP_NAME_SEPARATOR)
+                self.raw_timestamp = int(self.timestamp)
                 self.timestamp = datetime.fromtimestamp(int(self.timestamp))
             else:
                 raise ValueError("Invalid account")
         else:
             self.system_id = kwargs['system_id']
             self.account = kwargs['account']
-            self.timestamp = kwargs['timestamp']
+            if self.raw_timestamp:
+                self.timestamp = datetime.fromtimestamp(int(self.raw_timestamp))
+            else:
+                self.timestamp = kwargs['timestamp']
         self.keep = kwargs.get('keep', False)
         if re.match("[^a-zA-Z0-9#]", self.account):
             raise ValueError("Invalid account")
@@ -64,7 +68,10 @@ class Backup(object):
                .format(self.system_id, self.account, str(self.timestamp), self.is_local, self.is_remote, self.keep)
 
     def __eq__(self, other):
-        return self.system_id == other.system_id and self.account == other.account and self.timestamp == other.timestamp
+        if self.raw_timestamp:
+            return self.system_id == other.system_id and self.account == other.account and self.raw_timestamp == other.raw_timestamp
+        else:
+            return self.system_id == other.system_id and self.account == other.account and self.timestamp == other.timestamp
 
     def get_zip_name(self):
         if self.is_remote:
