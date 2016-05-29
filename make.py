@@ -31,7 +31,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 APP_VERSION = 304
 
 # a list of all supported operations
-SUPPORTED_OPERATIONS = ["clean", "build", "run", "dist_win", "dist_mac"]
+SUPPORTED_OPERATIONS = ["clean", "build", "run", "dist"]
 
 # what operations to run by default
 DEFAULT_OPERATIONS = ["clean", "build", "run"]
@@ -441,5 +441,13 @@ if __name__ == "__main__":
 
     # run each of the operations
     for op in args.operation:
+        if op == "dist":
+            if sys.platform.startswith("win32"):
+                op = "dist_win"
+            elif sys.platform.startswith("darwin"):
+                op = "dist_mac"
+            else:
+                print("Invalid platform: {}".format(sys.platform))
+                sys.exit(1)
         print("Executing '{}'...".format(op))
         getattr(Operations, op)()
