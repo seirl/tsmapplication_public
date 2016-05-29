@@ -68,7 +68,6 @@ class AppAPI:
         }
         if data:
             should_gzip = True
-            print(type(data))
             if type(data) == str:
                 headers['Content-Type'] = "text/plain"
             elif type(data) == bytes:
@@ -232,3 +231,14 @@ class AppAPI:
             return self._make_request("backup", b64encode(name.encode("ascii")).decode("ascii"))
         else:
             return self._make_request("backup")['data']
+
+
+    def analytics(self, account, data, update_time):
+        account = b64encode(account.encode("utf8")).decode("ascii")
+        # first, get the last update time
+        last_update = self._make_request("analytics", account)['lastUpload']
+        if update_time > last_update:
+            # this data is newer than what's on the server, so upload it
+            self._make_request("analytics", account, data=data)
+            return True
+        return False

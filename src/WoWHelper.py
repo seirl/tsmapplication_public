@@ -415,6 +415,26 @@ class WoWHelper(QObject):
         return result
 
 
+    def get_analytics_data(self):
+        result = {}
+        for account in self.get_accounts():
+            data = self._get_saved_variables(account, "TradeSkillMaster_AppHelper")
+            if not data:
+                continue
+            try:
+                account_data = data['analytics']
+                if not account_data:
+                    continue
+            except KeyError as e:
+                logging.getLogger().warn("No analytics data for {}".format(account))
+                continue
+            result[account] = {
+                'data': "[" + ",".join(account_data['data'].values()).replace("\\", "") + "]",
+                'updateTime': account_data['updateTime']
+            }
+        return result
+
+
     def _parse_csv(self, data):
         import csv
         result = []
