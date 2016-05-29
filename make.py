@@ -204,8 +204,11 @@ class Operations:
         # generate _version.py
         with open(os.path.join(BUILD_DIR, "_version.py"), "w") as f:
             f.write("VERSION={}\n".format(APP_VERSION))
-            import subprocess
-            commit = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode("ascii").strip()
+            if args.git_commit:
+                commit = args.git_commit
+            else:
+                import subprocess
+                commit = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode("ascii").strip()
             f.write("COMMIT=\"{}\"\n".format(commit))
 
 
@@ -425,6 +428,7 @@ if __name__ == "__main__":
     parser.add_argument("operation", nargs="*", default=DEFAULT_OPERATIONS,
                         help="Specifies which operation(s) to perform. If not specified, will run '{}'. Supported operations are {}"
                              .format(" ".join(DEFAULT_OPERATIONS), ", ".join(["'{}'".format(x) for x in SUPPORTED_OPERATIONS])))
+    parser.add_argument("--git_commit", help="Overrides the git commit hash used for generating _version.py")
     args = parser.parse_args()
     # check that all the operations are valid (cause argparse can't easily do this for us in this case)
     for op in args.operation:
