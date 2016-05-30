@@ -28,7 +28,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 
 
 # the curent app version
-APP_VERSION = 304
+APP_VERSION = 305
 
 # a list of all supported operations
 SUPPORTED_OPERATIONS = ["clean", "build", "run", "dist"]
