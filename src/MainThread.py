@@ -800,11 +800,8 @@ class MainThread(QThread):
 
 
     def _get_file_md5(self, path):
-        file_hash = md5()
         with open(path, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), ''):
-                file_hash.update(chunk)
-        return file_hash.hexdigest()
+            return md5(f.read()).hexdigest()
 
 
     def _update_app(self):
