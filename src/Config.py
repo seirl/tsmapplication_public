@@ -35,7 +35,6 @@ GIT_COMMIT = _version.COMMIT
 LOG_FILE_PATH = None
 BACKUP_DIR_PATH = None
 STATUS_CHECK_INTERVAL_S = 10 * 60
-APP_API_BASE_URL = "http://app-server.tradeskillmaster.com/v2"
 BACKUP_TIME_FORMAT = "%Y%m%d%H%M%S"
 BACKUP_NAME_SEPARATOR = "_"
 MAX_DATA_AGE = 24 * 60 * 60

@@ -28,7 +28,7 @@ import json
 import logging
 import socket
 from time import time
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
@@ -60,8 +60,8 @@ class AppAPI:
 
 
     def _make_request(self, *args, **kwargs):
+        endpoint = args[0]
         data = kwargs.pop('data', None)
-        alt_url = kwargs.pop('alt_url', None)
         assert(not kwargs)
         headers = {
             'Accept-Encoding': 'gzip',
@@ -86,16 +86,19 @@ class AppAPI:
                 data = buffer.getvalue()
                 headers['Content-Encoding'] = "gzip"
         current_time = int(time())
-        if alt_url:
-            url = alt_url
+        query_params = {
+            'session': self._user_info['session'],
+            'version': Config.CURRENT_VERSION,
+            'time': current_time,
+            'token': sha256("{}:{}:{}".format(Config.CURRENT_VERSION, current_time, PrivateConfig.get_token_salt()).encode("utf-8")).hexdigest()
+        }
+        if endpoint in ("login", "log"):
+            subdomain = "app-server"
         else:
-            query_params = {
-                'session': self._user_info['session'],
-                'version': Config.CURRENT_VERSION,
-                'time': current_time,
-                'token': sha256("{}:{}:{}".format(Config.CURRENT_VERSION, current_time, PrivateConfig.get_token_salt()).encode("utf-8")).hexdigest()
-            }
-            url = "{}/{}?{}".format(Config.APP_API_BASE_URL, "/".join(args), urlencode(query_params))
+            if endpoint not in self._user_info['endpointSubdomains']:
+                raise ApiTransientError("Endpoint disabled.")
+            subdomain = self._user_info['endpointSubdomains'][endpoint]
+        url = "http://{}.tradeskillmaster.com/v2/{}?{}".format(subdomain, "/".join([quote(a) for a in args]), urlencode(query_params))
         logger = logging.getLogger()
         logger.debug("Making request: {}".format(url))
         try:
@@ -114,7 +117,7 @@ class AppAPI:
                         # the data is invalid
                         logger.error("Invalid data: '{}'".format(raw_data))
                         raise ApiTransientError()
-                    elif not alt_url and not data.pop("success", False):
+                    elif not data.pop("success", False):
                         # this request failed and we got an error back
                         raise ApiError(data['error'])
                     # this request was successful
