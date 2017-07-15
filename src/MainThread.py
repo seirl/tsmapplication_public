@@ -224,6 +224,8 @@ class MainThread(QThread):
                 os.system("osascript -e 'tell application \"System Events\" to make login item at end with properties {{path:\"{}\", hidden:false}}'".format(app_path))
             else:
                 os.system("osascript -e 'tell application \"System Events\" to delete login item \"TSMApplication\"'")
+        elif Config.IS_LINUX:
+            pass # Linux users will have to setup that themselves.
         else:
             raise Exception("Unexpected platform")
 

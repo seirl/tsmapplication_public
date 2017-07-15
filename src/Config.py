@@ -24,7 +24,8 @@ import _version
 # Constant context parameters
 IS_WINDOWS = sys.platform.startswith("win32")
 IS_MAC = sys.platform.startswith("darwin")
-assert(IS_WINDOWS != IS_MAC) # only one should be set
+IS_LINUX = sys.platform.startswith("linux")
+assert(IS_WINDOWS + IS_MAC + IS_LINUX == 1) # only one should be set
 
 
 # General app constants
